@@ -166,10 +166,12 @@ body.ro .edit{display:none!important}
           <div class="edit">
           <div class="line"><textarea id="importText" rows="3" placeholder="Paste JSON / JSONを貼り付け"></textarea></div>
           <div class="line">
-            <button class="btn sm" id="btnImport">Load JSON / 読み込む</button>
+            <button class="btn sm" id="btnImport">Load (replace) / 置き換え</button>
+            <button class="btn sm" id="btnMergeJson">Merge / 結合</button>
             <button class="btn sm danger" id="btnClear">Clear all / すべて消す</button>
           </div>
-          <div class="muted">Your layout is saved in this browser automatically. / 自分の配置はこのブラウザに自動保存されます。</div>
+          <div class="muted">Merge matches alliances by name: an alliance in the incoming data replaces that alliance's AFs &amp; Flags in your layout; other alliances stay.<br>結合は同盟名で照合し、取り込んだ同盟の配置だけを入れ替えます。ほかの同盟はそのまま残ります。</div>
+          <div class="muted" style="margin-top:6px">Your layout is saved in this browser automatically. / 自分の配置はこのブラウザに自動保存されます。</div>
           </div>
         </section>
       </div>
@@ -528,8 +530,8 @@ function renderSource(){
   document.body.classList.toggle('has-banner', ro());
   const b = $('#banner');
   if (ro()){
-    b.innerHTML = `<span><b>View only</b>: ${SRC_LABEL[source]}. To edit, make your own copy. / 閲覧のみです。編集するには自分用にコピーしてください。</span>
-      <span class="spacer"></span><button class="btn sm" id="bnCopy">Copy &amp; edit</button><button class="btn sm" id="bnMine">My layout</button>`;
+    b.innerHTML = `<span><b>View only</b>: ${SRC_LABEL[source]}. "Merge" adds its alliances to your layout, "Copy &amp; edit" replaces your layout. / 閲覧のみです。Mergeで自分の配置に結合、Copy &amp; editで丸ごと置き換え。</span>
+      <span class="spacer"></span><button class="btn sm" id="bnMerge" title="Add these alliances into your layout / 自分の配置に結合">Merge</button><button class="btn sm" id="bnCopy">Copy &amp; edit</button><button class="btn sm" id="bnMine">My layout</button>`;
     b.style.display = 'flex';
   } else b.style.display = 'none';
   $('#legend').style.top = (ro() ? b.offsetHeight + 10 : 10) + 'px';
@@ -543,7 +545,51 @@ function openSource(src){
   renderSource(); renderAll();
 }
 $('#srcSel').addEventListener('change', e => openSource(e.target.value));
+// 結合：同盟名で照合し、取り込む同盟の配置だけを入れ替える
+const normName = n => String(n).trim().toLowerCase();
+function mergeInto(base, inc){
+  const report = [];
+  for (const ia of inc.alliances){
+    const its = inc.items.filter(i => i.a === ia.id);
+    let ma = base.alliances.find(a => normName(a.name) === normName(ia.name));
+    let replaced = 0;
+    if (ma){
+      replaced = base.items.filter(i => i.a === ma.id).length;
+      if (!its.length && replaced) continue;   // 相手側が空なら消さない
+      base.items = base.items.filter(i => i.a !== ma.id);
+    } else {
+      if (!its.length) continue;
+      const used = new Set(base.alliances.map(a => a.color.toLowerCase()));
+      const color = used.has(ia.color.toLowerCase()) ? (PALETTE.find(c => !used.has(c)) || ia.color) : ia.color;
+      ma = {id:'a' + Date.now().toString(36) + base.alliances.length, name:ia.name, color};
+      base.alliances.push(ma);
+    }
+    for (const it of its) base.items.push(snapItem({id:uid(), type:it.type, a:ma.id, x:it.x, y:it.y}, base.settings));
+    report.push(`${ia.name} ${replaced ? `updated (${replaced}→${its.length})` : `added (${its.length})`}`);
+  }
+  return report;
+}
+function doMerge(inc){
+  const names = inc.alliances.filter(a => inc.items.some(i => i.a === a.id)).map(a => a.name);
+  if (!names.length){ toast('Nothing to merge / 結合する配置がありません'); return false; }
+  const base = mine || defaultState();
+  const hit = names.filter(n => base.alliances.some(a => normName(a.name) === normName(n) && base.items.some(i => i.a === a.id)));
+  if (hit.length && !confirm(`These alliances will be replaced in your layout:\n${hit.join(', ')}\n\n自分の配置のこれらの同盟は入れ替わります。よろしいですか？`)) return false;
+  const report = mergeInto(base, inc);
+  mine = base; source = 'mine'; S = mine; save();
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  sharedData = null; selectedId = null;
+  renderSource(); renderAll();
+  toast('Merged / 結合しました: ' + report.join(', '));
+  return true;
+}
+$('#btnMergeJson').addEventListener('click', () => {
+  if (ro()) return;
+  let inc; try{ inc = sanitize(JSON.parse($('#importText').value)); }catch(e){ toast('Invalid JSON / JSONの形式が正しくありません'); return; }
+  if (doMerge(inc)) $('#importText').value = '';
+});
 $('#banner').addEventListener('click', e => {
+  if (e.target.id === 'bnMerge') doMerge(clone(S));
   if (e.target.id === 'bnMine') openSource('mine');
   if (e.target.id === 'bnCopy'){
     if (mine && mine.items.length && !confirm('This will replace your current layout. Continue?\n今の自分の配置は上書きされます。よろしいですか？')) return;
