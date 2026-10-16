@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Alliance Territory Planner</title>
+<style>
+:root{
+  --bg:#12161a;--panel:#1d242b;--panel2:#262f38;--line:#33404c;
+  --text:#e8edf2;--muted:#93a1ae;--accent:#4cc3d9;--danger:#ef5a52;--ok:#5cc884;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:14px;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);z-index:6}
+header h1{font-size:15px;margin:0;font-weight:700;white-space:nowrap}
+#coord{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:700;white-space:nowrap}
+#viewport{position:relative;flex:1;overflow:hidden;touch-action:none;background:#0b0e11;cursor:grab;-webkit-user-select:none;user-select:none}
+#viewport.placing{cursor:crosshair}
+#world{position:absolute;left:0;top:0;width:1200px;height:1200px;transform-origin:0 0}
+#mapimg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;-webkit-user-drag:none}
+#svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#nomap{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;color:var(--muted);
+  background:repeating-linear-gradient(45deg,#1a2026 0 20px,#161b20 20px 40px);font-size:40px;line-height:1.6;padding:40px}
+.grid10{display:none}
+#viewport.zhi .grid10{display:inline}
+
+/* bottom bar */
+#bar{display:flex;gap:6px;align-items:center;padding:8px;background:var(--panel);border-top:1px solid var(--line);z-index:6;overflow-x:auto}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#4a5a69}
+.btn.on{background:var(--accent);border-color:var(--accent);color:#06222a;font-weight:700}
+.btn.danger{color:var(--danger)}
+.btn.on.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.sm{padding:4px 8px;font-size:13px}
+.spacer{flex:1}
+select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 8px}
+input[type=number],input[type=text],textarea{background:#11161b;border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%}
+input[type=number]{width:80px}
+
+/* selection card */
+#card{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:10px 12px;display:none;z-index:4;width:min(420px,calc(100% - 20px));box-shadow:0 6px 24px #0008}
+#card .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#card .title{font-weight:700;margin-bottom:6px;display:flex;gap:8px;align-items:center}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;font-weight:700}
+.tag.ok{background:#1f4d33;color:var(--ok)}
+.tag.ng{background:#5a2422;color:#ff8a83}
+.swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;border:1px solid #0006}
+
+/* panel */
+#panel{position:absolute;top:0;right:0;bottom:0;width:360px;max-width:100%;background:var(--panel);border-left:1px solid var(--line);
+  z-index:8;transform:translateX(105%);transition:transform .2s;display:flex;flex-direction:column}
+#panel.open{transform:none}
+#panel .head{display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);font-weight:700}
+#panel .body{overflow-y:auto;padding:4px 12px 40px}
+section{border-bottom:1px solid var(--line);padding:12px 0}
+section h2{font-size:13px;margin:0 0 8px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.line{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap}
+.list{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow-y:auto}
+.li{display:flex;align-items:center;gap:6px;background:var(--panel2);border-radius:8px;padding:6px 8px;font-size:13px}
+.li .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.muted{color:var(--muted);font-size:12px}
+table.stats{width:100%;border-collapse:collapse;font-size:13px}
+table.stats td,table.stats th{padding:4px 4px;border-bottom:1px solid var(--line);text-align:right}
+table.stats td:first-child,table.stats th:first-child{text-align:left}
+label.chk{display:flex;gap:8px;align-items:center;margin:6px 0;cursor:pointer}
+#toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:#000c;padding:8px 14px;border-radius:8px;
+  z-index:9;display:none;font-size:13px;pointer-events:none}
+#banner{position:absolute;left:0;right:0;top:0;z-index:5;display:none;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 12px;background:#3a2f12ee;border-bottom:1px solid #6b5520;font-size:13px}
+#banner b{color:#f2c94c}
+#legend{position:absolute;left:10px;top:10px;z-index:3;background:#12161add;border:1px solid var(--line);border-radius:10px;
+  padding:6px 10px;font-size:12px;pointer-events:none;max-width:60%}
+#legend div{display:flex;gap:6px;align-items:center;white-space:nowrap;line-height:1.7}
+#legend .n{margin-left:auto;padding-left:10px;color:var(--muted)}
+body.ro .edit{display:none!important}
+#srcSel{padding:4px 6px;font-size:13px}
+#allianceSel{border-left-width:6px}
+@media (max-width:480px){ header h1{display:none} }
+@media (max-width:640px){
+  #panel{top:auto;width:100%;height:72%;border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;transform:translateY(105%)}
+  header h1{font-size:14px}
+  .btn{padding:8px 10px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Territory Planner</h1>
+    <select id="srcSel" title="Layout to show"></select>
+    <span id="coord">X — / Y —</span>
+  </header>
+  <div id="viewport">
+    <div id="world">
+      <div id="nomap">Map image not found<br><small>Put map.jpg next to index.html / map.jpg を index.html と同じ場所に置いてください</small></div>
+      <img id="mapimg" alt="" draggable="false">
+      <svg id="svg" viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
+        <g id="gGrid"></g>
+        <g id="gTerr"></g>
+        <g id="gCrys"></g>
+        <g id="gGhost"></g>
+        <g id="gMark"></g>
+      </svg>
+    </div>
+    <div id="banner"></div>
+    <div id="legend"></div>
+    <div id="card"></div>
+    <div id="toast"></div>
+    <aside id="panel">
+      <div class="head">Menu / メニュー<span class="spacer"></span><button class="btn sm" id="closePanel">Close</button></div>
+      <div class="body">
+        <section class="edit">
+          <h2>Place by coordinates / 座標を指定して配置</h2>
+          <div class="line">
+            <select id="inType"><option value="fort">AF</option><option value="flag">Flag</option></select>
+            X <input type="number" id="inX" min="0" max="1199" inputmode="numeric">
+            Y <input type="number" id="inY" min="0" max="1199" inputmode="numeric">
+          </div>
+          <div class="line"><button class="btn" id="btnPlace">Place / 配置</button><span class="muted">Uses the alliance selected in the bottom bar / 下のバーで選択中の同盟</span></div>
+        </section>
+        <section>
+          <h2>Summary / 集計</h2>
+          <table class="stats" id="statsTable"></table>
+          <div class="muted" id="crysInfo" style="margin-top:6px"></div>
+        </section>
+        <section>
+          <h2>Alliances / 同盟</h2>
+          <div class="list" id="allianceList"></div>
+          <div class="line edit"><button class="btn sm" id="btnAddAlliance">+ Add alliance / 同盟を追加</button></div>
+          <div class="muted">Changing a color recolors that alliance's whole territory.<br>色を変えると、その同盟の領土・旗・水晶の色がすべて変わります。</div>
+        </section>
+        <section>
+          <h2>Placed AFs &amp; Flags / 配置一覧</h2>
+          <div class="list" id="itemList"></div>
+        </section>
+        <section>
+          <h2>Display / 表示</h2>
+          <label class="chk"><input type="checkbox" id="lyCrys"> Crystals / 水晶</label>
+          <label class="chk"><input type="checkbox" id="lyLabels"> AF labels / 要塞の名前</label>
+          <label class="chk"><input type="checkbox" id="lyLegend"> Legend / 凡例</label>
+          <label class="chk"><input type="checkbox" id="lyGrid"> Grid (100, 10 when zoomed) / グリッド</label>
+        </section>
+        <section class="edit">
+          <h2>Rules / ルール設定</h2>
+          <div class="line">AF territory / 要塞の領土 ±<input type="number" id="stFort" min="0" max="100"></div>
+          <div class="line">Max AFs per alliance / 1同盟の要塞数 <input type="number" id="stMaxAF" min="1" max="10"></div>
+          <div class="line">Flag territory / 旗の領土 ±<input type="number" id="stFlag" min="0" max="100"></div>
+          <div class="line">Grid step / 吸着の間隔 <input type="number" id="stStep" min="1" max="50"> offset / ずらし <input type="number" id="stOff" min="0" max="49"></div>
+          <div class="muted">Step 3, offset 1 → flag centers are 1, 4, 7, 10… and a ±4 territory lines up with the 3-tile blocks (e.g. X 534–542).<br>間隔3・ずらし1なら旗の中心は 1, 4, 7, 10… になり、±4の領土が3マスのブロックにぴったり揃います（例：X 534〜542）。</div>
+          <label class="chk"><input type="checkbox" id="stSnapAF"> AFs use the same 3-tile grid / 要塞も同じ3マス刻みに吸着</label>
+          <label class="chk"><input type="checkbox" id="stDiag"> Corner touch counts as connected / 角だけの接触も隣接とみなす</label>
+          <div class="muted">A Flag is active when its territory overlaps or touches an AF or another active Flag of the same alliance.<br>旗は同じ同盟の要塞か有効な旗の領土に重なる・接する場合に有効です。</div>
+        </section>
+        <section>
+          <h2>Share &amp; Data / 共有・データ</h2>
+          <div class="line">
+            <button class="btn sm" id="btnShare">Copy view-only link / 閲覧用URL</button>
+            <button class="btn sm" id="btnExport">Save layout.json / 公開用に保存</button>
+          </div>
+          <div class="muted">People who open the link can only view it. To edit, they press "Copy &amp; edit" to make their own copy. The link is a snapshot.<br>閲覧用URLを開いた人は見るだけです。編集したい人は「Copy &amp; edit」で自分用に複製します。URLはコピーした時点の内容です。</div>
+          <div class="muted" style="margin-top:6px">Upload layout.json next to index.html and everyone sees it as the "Published" layout.<br>layout.json を index.html と同じフォルダに置くと、全員に「公開版」として表示されます。</div>
+          <div class="edit">
+          <div class="line"><textarea id="importText" rows="3" placeholder="Paste JSON / JSONを貼り付け"></textarea></div>
+          <div class="line">
+            <button class="btn sm" id="btnImport">Load JSON / 読み込む</button>
+            <button class="btn sm danger" id="btnClear">Clear all / すべて消す</button>
+          </div>
+          <div class="muted">Your layout is saved in this browser automatically. / 自分の配置はこのブラウザに自動保存されます。</div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+  <div id="bar">
+    <button class="btn on" data-mode="view">Select</button>
+    <button class="btn edit" data-mode="fort">AF</button>
+    <button class="btn edit" data-mode="flag">Flag</button>
+    <button class="btn danger edit" data-mode="del">Delete</button>
+    <select id="allianceSel" class="edit" title="Alliance to place"></select>
+    <button class="btn edit" id="btnQuickAlliance" title="Add alliance">+ Alliance</button>
+    <span class="spacer"></span>
+    <button class="btn" id="btnFit">Fit</button>
+    <button class="btn" id="btnMenu">Menu</button>
+  </div>
+</div>
+
+<script src="crystals.js"></script>
+<script>
+'use strict';
+/* ===== 設定 ===== */
+const MAP_SIZE = 1200;          // ゲーム内座標の範囲（0〜1199）
+const MAP_IMAGE = 'map.jpg';    // マップ画像ファイル名（サイズは自由。正方形であること）
+const STORE_KEY = 'territory-planner-v1';
+const PALETTE = ['#4cc3d9','#ef5a52','#f2c94c','#a07cf5','#5cc884','#ff8a3d','#e86fb2','#ffffff'];
+
+/* ===== ユーティリティ ===== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const toInt = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none',1800); }
+
+/* ===== 状態 ===== */
+function defaultState(){
+  return { v:1,
+    alliances:[{id:'a1', name:'62Ys', color:PALETTE[0]}],
+    items:[],   // {id, type:'fort'|'flag', a:allianceId, x, y}
+    settings:{fortR:7, flagR:4, diag:false, flagStep:3, flagOff:1, maxAF:2, rv:2, snapAF:true} };
+}
+let S = defaultState();
+// 表示設定（配置データとは別に保存）
+const LAYER_KEY = 'base-sim-layers';
+let L = {crystals:true, labels:true, grid:false, legend:true};
+try{ Object.assign(L, JSON.parse(localStorage.getItem(LAYER_KEY) || '{}')); }catch(e){}
+function saveLayers(){ try{ localStorage.setItem(LAYER_KEY, JSON.stringify(L)); }catch(e){} }
+// 表示中のデータの出どころ：mine=自分の配置（編集可） / published=公開版 / shared=閲覧用URL
+let source = 'mine', mine = null, published = null, sharedData = null;
+const ro = () => source !== 'mine';
+let crystals = Array.isArray(window.CRYSTALS) ? window.CRYSTALS.filter(c => Array.isArray(c) && c.length >= 2) : [];
+let mode = 'view';
+let curAlliance = 'a1';
+let selectedId = null;
+let D = { valid:new Map(), itemCrys:new Map(), crysOwner:[], stats:new Map() };
+
+function sanitize(raw){
+  const s = defaultState();
+  if (!raw || typeof raw !== 'object') return s;
+  if (Array.isArray(raw.alliances) && raw.alliances.length){
+    s.alliances = raw.alliances.filter(a => a && a.id).map((a,i) => ({
+      id:String(a.id), name:String(a.name ?? ('Alliance'+(i+1))).slice(0,30),
+      color:/^#[0-9a-fA-F]{6}$/.test(a.color) ? a.color : PALETTE[i % PALETTE.length] }));
+  }
+  const ids = new Set(s.alliances.map(a => a.id));
+  if (Array.isArray(raw.items)){
+    s.items = raw.items.filter(it => it && (it.type==='fort'||it.type==='flag') && ids.has(String(it.a))).map(it => ({
+      id:String(it.id || uid()), type:it.type, a:String(it.a),
+      x:clamp(toInt(it.x,0),0,MAP_SIZE-1), y:clamp(toInt(it.y,0),0,MAP_SIZE-1) }));
+  }
+  if (raw.settings){
+    s.settings.fortR = clamp(toInt(raw.settings.fortR,7),0,100);
+    if (raw.settings.rv === 2) s.settings.flagR = clamp(toInt(raw.settings.flagR,4),0,100);
+    s.settings.diag = !!raw.settings.diag;
+    s.settings.snapAF = raw.settings.snapAF !== false;
+    s.settings.maxAF = clamp(toInt(raw.settings.maxAF,2),1,10);
+    s.settings.flagStep = clamp(toInt(raw.settings.flagStep,3),1,50);
+    if (raw.settings.rv === 2) s.settings.flagOff = clamp(toInt(raw.settings.flagOff,1),0,49) % s.settings.flagStep;
+  }
+  for (const it of s.items) snapItem(it, s.settings);
+  return s;
+}
+let _uid = 0;
+function uid(){ return 'i' + Date.now().toString(36) + (_uid++).toString(36); }
+// 旗は flagStep マス刻み（座標 = flagOff + flagStep×n）にしか置けない
+function snapCoord(v, st){
+  const step = st.flagStep || 1, off = (st.flagOff || 0) % step;
+  let n = Math.round((v - off) / step) * step + off;
+  while (n < 0) n += step; while (n > MAP_SIZE-1) n -= step;
+  return n;
+}
+const snaps = (it, st = S.settings) => it.type==='flag' || (it.type==='fort' && st.snapAF);
+function snapItem(it, st = S.settings){ if (snaps(it, st)){ it.x = snapCoord(it.x, st); it.y = snapCoord(it.y, st); } return it; }
+
+function save(){ if (ro()) return; try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }catch(e){} }
+function loadMine(){ try{ const t = localStorage.getItem(STORE_KEY); if (t) return sanitize(JSON.parse(t)); }catch(e){} return null; }
+const clone = o => JSON.parse(JSON.stringify(o));
+
+// 閲覧用URL用の短い形式
+function packState(st){
+  const idx = new Map(st.alliances.map((a,i) => [a.id,i]));
+  return {v:2, al:st.alliances.map(a => [a.name,a.color]),
+    it:st.items.map(i => [i.type==='fort'?0:1, idx.get(i.a), i.x, i.y]),
+    st:[st.settings.fortR, st.settings.flagR, st.settings.diag?1:0, st.settings.flagStep, st.settings.flagOff, st.settings.maxAF, 2, st.settings.snapAF?1:0]};
+}
+function unpackState(o){
+  if (!o || o.v !== 2) return o;
+  return { alliances:o.al.map((a,i) => ({id:'a'+(i+1), name:a[0], color:a[1]})),
+    items:o.it.map((t,k) => ({id:'s'+k, type:t[0]?'flag':'fort', a:'a'+(t[1]+1), x:t[2], y:t[3]})),
+    settings:{fortR:o.st[0], flagR:o.st[1], diag:!!o.st[2], flagStep:o.st[3], flagOff:o.st[4], maxAF:o.st[5] ?? 2, rv:o.st[6] ?? 1, snapAF:o.st[7] !== 0} };
+}
+function bytesToB64(b){ let bin=''; for (const x of b) bin += String.fromCharCode(x); return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64ToBytes(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+async function encodeShare(st){
+  const json = JSON.stringify(packState(st));
+  if (window.CompressionStream){
+    const buf = await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();
+    return 'z=' + bytesToB64(new Uint8Array(buf));
+  }
+  return 's=' + b64e(json);
+}
+async function decodeShare(h){
+  if (h.startsWith('#z=')){
+    const txt = await new Response(new Blob([b64ToBytes(h.slice(3))]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    return unpackState(JSON.parse(txt));
+  }
+  if (h.startsWith('#s=')) return unpackState(JSON.parse(b64d(h.slice(3))));
+  throw new Error('bad');
+}
+function b64e(str){ const b=new TextEncoder().encode(str); let bin=''; for(const x of b) bin+=String.fromCharCode(x); return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function b64d(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; const bin=atob(s); return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))); }
+
+/* ===== ルール計算 ===== */
+// 領土（両端を含むマス範囲）
+function rectOf(it){ const r = it.type==='fort' ? S.settings.fortR : S.settings.flagR; return {x0:it.x-r, x1:it.x+r, y0:it.y-r, y1:it.y+r}; }
+// 重なっている or 辺で接している
+function adjacent(a, b){
+  const gx = Math.max(a.x0 - b.x1, b.x0 - a.x1);
+  const gy = Math.max(a.y0 - b.y1, b.y0 - a.y1);
+  if (gx <= 0 && gy <= 0) return true;
+  if (gx === 1 && gy <= 0) return true;
+  if (gy === 1 && gx <= 0) return true;
+  if (S.settings.diag && gx === 1 && gy === 1) return true;
+  return false;
+}
+function inRect(r, tx, ty){ return tx>=r.x0 && tx<=r.x1 && ty>=r.y0 && ty<=r.y1; }
+
+function compute(){
+  const valid = new Map();
+  for (const a of S.alliances){
+    const its = S.items.filter(i => i.a === a.id);
+    const okRects = [];
+    for (const f of its) if (f.type==='fort'){ valid.set(f.id,true); okRects.push(rectOf(f)); }
+    let pending = its.filter(i => i.type==='flag');
+    let changed = true;
+    while (changed && pending.length){
+      changed = false;
+      pending = pending.filter(f => {
+        const rf = rectOf(f);
+        if (okRects.some(o => adjacent(rf,o))){ valid.set(f.id,true); okRects.push(rf); changed = true; return false; }
+        return true;
+      });
+    }
+    for (const f of pending) valid.set(f.id,false);
+  }
+  const rects = S.items.map(it => ({it, r:rectOf(it), ok:valid.get(it.id)}));
+  const itemCrys = new Map(S.items.map(i => [i.id,0]));
+  const stats = new Map(S.alliances.map(a => [a.id,{forts:0,flags:0,flagsOk:0,tiles:0,crys:0}]));
+  for (const {it,ok} of rects){ const st=stats.get(it.a); if(!st) continue; if(it.type==='fort') st.forts++; else { st.flags++; if(ok) st.flagsOk++; } }
+  const crysOwner = new Array(crystals.length).fill(null);
+  crystals.forEach((c,k) => {
+    const tx = Math.floor(c[0]), ty = Math.floor(c[1]);
+    const owners = new Set();
+    for (const {it,r,ok} of rects){ if (inRect(r,tx,ty)){ itemCrys.set(it.id, itemCrys.get(it.id)+1); if (ok) owners.add(it.a); } }
+    for (const a of owners) stats.get(a).crys++;
+    crysOwner[k] = owners.size === 0 ? null : (owners.size > 1 ? '*' : [...owners][0]);
+  });
+  // 有効領土のマス数（重なりは1回だけ数える）
+  const bm = new Uint8Array(MAP_SIZE*MAP_SIZE);
+  for (const a of S.alliances){
+    bm.fill(0); let n = 0;
+    for (const {it,r,ok} of rects){
+      if (it.a!==a.id || !ok) continue;
+      const x0=clamp(r.x0,0,MAP_SIZE-1), x1=clamp(r.x1,0,MAP_SIZE-1), y0=clamp(r.y0,0,MAP_SIZE-1), y1=clamp(r.y1,0,MAP_SIZE-1);
+      for (let y=y0;y<=y1;y++){ const row=y*MAP_SIZE; for(let x=x0;x<=x1;x++){ if(!bm[row+x]){ bm[row+x]=1; n++; } } }
+    }
+    stats.get(a.id).tiles = n;
+  }
+  const afNo = new Map(), cnt = {};
+  for (const it of S.items) if (it.type==='fort'){ cnt[it.a] = (cnt[it.a]||0) + 1; afNo.set(it.id, cnt[it.a]); }
+  D = {valid, itemCrys, crysOwner, stats, afNo};
+}
+
+/* ===== 描画 ===== */
+const NS = 'http://www.w3.org/2000/svg';
+const allianceOf = id => S.alliances.find(a => a.id===id);
+const itemName = it => it.type==='fort' ? 'AF' + (D.afNo?.get(it.id) || '') : 'Flag';
+// ゲーム座標(マス) → SVG座標。マス(x,y)は x..x+1, y..y+1 の正方形
+const sy = gy => MAP_SIZE - gy;
+
+function renderGrid(){
+  let h = '';
+  if (L.grid){
+    for (let v=10; v<MAP_SIZE; v+=10){
+      const major = v % 100 === 0;
+      const cls = major ? '' : ' class="grid10"';
+      const st = major ? 'stroke="#ffffff" stroke-opacity=".35" stroke-width="1"' : 'stroke="#ffffff" stroke-opacity=".15" stroke-width=".6"';
+      h += `<line${cls} x1="${v}" y1="0" x2="${v}" y2="${MAP_SIZE}" ${st} vector-effect="non-scaling-stroke"/>`;
+      h += `<line${cls} x1="0" y1="${sy(v)}" x2="${MAP_SIZE}" y2="${sy(v)}" ${st} vector-effect="non-scaling-stroke"/>`;
+    }
+  }
+  $('#gGrid').innerHTML = h;
+}
+function renderTerr(){
+  let h = '';
+  // 無効 → 有効 → 選択中 の順に重ねる
+  const order = [...S.items].sort((a,b) => (D.valid.get(a.id)?1:0)-(D.valid.get(b.id)?1:0) || (a.type==='fort'?-1:1));
+  for (const it of order){
+    const al = allianceOf(it.a); const r = rectOf(it); const ok = D.valid.get(it.id);
+    const x=r.x0, y=sy(r.y1+1), w=r.x1-r.x0+1;
+    const sel = it.id===selectedId;
+    if (ok){
+      h += `<rect x="${x}" y="${y}" width="${w}" height="${w}" fill="${al.color}" fill-opacity="${it.type==='fort'?.30:.20}" stroke="${sel?'#fff':al.color}" stroke-width="${sel?2.5:1.5}" vector-effect="non-scaling-stroke"/>`;
+    } else {
+      h += `<rect x="${x}" y="${y}" width="${w}" height="${w}" fill="#888" fill-opacity=".15" stroke="${sel?'#fff':'#ef5a52'}" stroke-width="${sel?2.5:1.5}" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>`;
+    }
+  }
+  $('#gTerr').innerHTML = h;
+}
+function renderCrys(){
+  if (!L.crystals){ $('#gCrys').innerHTML=''; return; }
+  let h = '';
+  crystals.forEach((c,k) => {
+    const o = D.crysOwner[k];
+    let fill = 'none', stroke = '#ff3b3b';
+    if (o === '*'){ fill = '#ffffff'; stroke = '#ffffff'; }
+    else if (o){ const al = allianceOf(o); fill = al ? al.color : '#fff'; stroke = '#ffffff'; }
+    h += `<circle cx="${c[0]}" cy="${sy(c[1])}" r="2.6" fill="${fill}" fill-opacity="${o?0.9:0}" stroke="${stroke}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`;
+  });
+  $('#gCrys').innerHTML = h;
+}
+function markerScale(){ return (1.3/view.s) * (view.s < 0.8 ? 0.75 : 1); }
+function renderMarks(){
+  const k = markerScale();
+  let h = '';
+  const order = [...S.items].sort((a,b) => (a.type==='fort'?1:0)-(b.type==='fort'?1:0));
+  for (const it of order){
+    const al = allianceOf(it.a); const ok = D.valid.get(it.id);
+    const cx = it.x + .5, cy = sy(it.y + .5);
+    const sel = it.id===selectedId;
+    let inner;
+    if (it.type==='fort'){
+      inner = `<path d="M-9 9V-3h0V-9h4v3h3v-3h4v3h3v-3h4V9Z" fill="${al.color}" stroke="${sel?'#fff':'#0b0e11'}" stroke-width="${sel?2.5:1.6}" stroke-linejoin="round"/>
+        <rect x="-2.5" y="2" width="5" height="7" fill="#0b0e11" opacity=".55"/>`;
+      if (L.labels) inner += `<text y="-14" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" stroke="#0b0e11" stroke-width="3" paint-order="stroke">${esc(al.name)} ${itemName(it)}</text>`;
+    } else {
+      const c = ok ? al.color : '#ef5a52';
+      inner = `<line x1="-4" y1="9" x2="-4" y2="-9" stroke="#0b0e11" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="-4" y1="9" x2="-4" y2="-9" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M-3 -9L8 -5L-3 -1Z" fill="${c}" stroke="${sel?'#fff':'#0b0e11'}" stroke-width="${sel?2:1.3}" stroke-linejoin="round"/>`;
+      if (!ok) inner += `<text x="9" y="9" font-size="11" font-weight="800" fill="#ef5a52" stroke="#0b0e11" stroke-width="3" paint-order="stroke">!</text>`;
+    }
+    h += `<g class="mk" data-cx="${cx}" data-cy="${cy}" transform="translate(${cx} ${cy}) scale(${k})">${inner}</g>`;
+  }
+  $('#gMark').innerHTML = h;
+}
+function rescaleMarks(){
+  const k = markerScale();
+  for (const g of $('#gMark').children) g.setAttribute('transform', `translate(${g.dataset.cx} ${g.dataset.cy}) scale(${k})`);
+}
+function renderGhost(tile){
+  if (!tile || (mode!=='fort' && mode!=='flag') || !allianceOf(curAlliance)){ $('#gGhost').innerHTML=''; return; }
+  const tmp = snapItem({type:mode, a:curAlliance, x:tile.x, y:tile.y});
+  const r = rectOf(tmp);
+  let ok = true;
+  if (mode==='flag'){
+    ok = S.items.some(i => i.a===curAlliance && D.valid.get(i.id) && adjacent(r, rectOf(i)));
+  }
+  const col = ok ? '#5cc884' : '#ef5a52';
+  const w = r.x1-r.x0+1;
+  $('#gGhost').innerHTML = `<rect x="${r.x0}" y="${sy(r.y1+1)}" width="${w}" height="${w}" fill="${col}" fill-opacity=".18" stroke="${col}" stroke-width="2" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>
+    <rect x="${tmp.x}" y="${sy(tmp.y+1)}" width="1" height="1" fill="${col}"/>`;
+}
+
+function renderPanel(){
+  // 同盟セレクト
+  const sel = $('#allianceSel');
+  if (!allianceOf(curAlliance)) curAlliance = S.alliances[0]?.id;
+  sel.innerHTML = S.alliances.map(a => `<option value="${esc(a.id)}"${a.id===curAlliance?' selected':''}>${esc(a.name)}</option>`).join('');
+  // 集計
+  let t = '<tr><th>Alliance</th><th>AF</th><th>Flag (active)</th><th>Tiles</th><th>Crystal</th></tr>';
+  for (const a of S.alliances){
+    const st = D.stats.get(a.id);
+    t += `<tr><td><span class="swatch" style="background:${a.color}"></span> ${esc(a.name)}</td><td>${st.forts}</td><td>${st.flags}(${st.flagsOk})</td><td>${st.tiles.toLocaleString()}</td><td><b>${st.crys}</b></td></tr>`;
+  }
+  $('#statsTable').innerHTML = t;
+  $('#crysInfo').textContent = crystals.length ? `${crystals.length} crystals on map. Counted inside active territory. / 有効な領土内の水晶を集計` : 'No crystal data (crystals.js) / 水晶データなし';
+  // 同盟リスト
+  $('#allianceList').innerHTML = S.alliances.map(a => `
+    <div class="li"><input type="color" value="${a.color}" data-acolor="${esc(a.id)}" ${ro()?'disabled':''} style="width:28px;height:24px;border:0;padding:0;background:none">
+      <span class="grow">${esc(a.name)}</span><span class="muted">AF ${D.stats.get(a.id).forts}・Crystal ${D.stats.get(a.id).crys}</span>
+      <button class="btn sm edit" data-arename="${esc(a.id)}">Rename</button>
+      <button class="btn sm danger edit" data-adel="${esc(a.id)}">Delete</button></div>`).join('');
+  sel.style.borderLeftColor = allianceOf(curAlliance)?.color || '';
+  renderLegend();
+  // 配置一覧
+  const items = [...S.items].sort((a,b) => a.a.localeCompare(b.a) || (a.type==='fort'?-1:1) - (b.type==='fort'?-1:1));
+  $('#itemList').innerHTML = items.length ? items.map(it => {
+    const al = allianceOf(it.a); const ok = D.valid.get(it.id);
+    return `<div class="li"><span class="swatch" style="background:${al.color}"></span>
+      <span class="grow">${esc(al.name)} ${itemName(it)} (${it.x}, ${it.y}) · Crystal ${D.itemCrys.get(it.id)}</span>
+      ${ok?'':'<span class="tag ng">Inactive</span>'}
+      <button class="btn sm" data-goto="${esc(it.id)}">Show</button></div>`;
+  }).join('') : '<div class="muted">Nothing placed yet / まだ何もありません</div>';
+  // 表示・設定
+  $('#lyCrys').checked = L.crystals; $('#lyLabels').checked = L.labels; $('#lyGrid').checked = L.grid; $('#lyLegend').checked = L.legend;
+  $('#stFort').value = S.settings.fortR; $('#stMaxAF').value = S.settings.maxAF; $('#stFlag').value = S.settings.flagR; $('#stDiag').checked = S.settings.diag; $('#stSnapAF').checked = S.settings.snapAF; $('#stStep').value = S.settings.flagStep; $('#stOff').value = S.settings.flagOff;
+}
+function renderCard(){
+  const card = $('#card');
+  const it = S.items.find(i => i.id===selectedId);
+  if (!it){ card.style.display='none'; return; }
+  const al = allianceOf(it.a); const ok = D.valid.get(it.id);
+  card.innerHTML = `
+    <div class="title"><span class="swatch" style="background:${al.color}"></span>${esc(al.name)} ${itemName(it)}
+      <span class="tag ${ok?'ok':'ng'}">${ok?'Active':'Inactive (not connected) / 無効'}</span>
+      <span class="spacer"></span><button class="btn sm" id="cClose">×</button></div>
+    <div class="row muted" style="margin-bottom:6px"></div>
+    <div class="row edit">
+      X <input type="number" id="cX" value="${it.x}" min="0" max="1199">
+      Y <input type="number" id="cY" value="${it.y}" min="0" max="1199">
+      <button class="btn sm" data-nudge="-1,0">←</button><button class="btn sm" data-nudge="0,1">↑</button>
+      <button class="btn sm" data-nudge="0,-1">↓</button><button class="btn sm" data-nudge="1,0">→</button>
+      <span class="spacer"></span><button class="btn sm danger" id="cDel">Delete</button>
+    </div>`;
+  const r = rectOf(it);
+  card.querySelector('.row.muted').textContent = `Territory X ${r.x0}–${r.x1} / Y ${r.y0}–${r.y1} · Crystal ${D.itemCrys.get(it.id)}`;
+  card.style.display = 'block';
+}
+function renderLegend(){
+  const el = $('#legend');
+  const rows = S.alliances.filter(a => D.stats.get(a.id).forts || D.stats.get(a.id).flags);
+  if (!L.legend || !rows.length){ el.style.display = 'none'; return; }
+  el.innerHTML = rows.map(a => `<div><span class="swatch" style="background:${a.color}"></span>${esc(a.name)}<span class="n">Crystal ${D.stats.get(a.id).crys}</span></div>`).join('');
+  el.style.display = 'block';
+}
+const SRC_LABEL = {mine:'My layout', published:'Published', shared:'Shared link'};
+function renderSource(){
+  const opts = ['mine'];
+  if (published) opts.push('published');
+  if (sharedData) opts.push('shared');
+  const sel = $('#srcSel');
+  sel.innerHTML = opts.map(o => `<option value="${o}"${o===source?' selected':''}>${SRC_LABEL[o]}</option>`).join('');
+  sel.style.display = opts.length > 1 ? '' : 'none';
+  document.body.classList.toggle('ro', ro());
+  document.body.classList.toggle('has-banner', ro());
+  const b = $('#banner');
+  if (ro()){
+    b.innerHTML = `<span><b>View only</b>: ${SRC_LABEL[source]}. To edit, make your own copy. / 閲覧のみです。編集するには自分用にコピーしてください。</span>
+      <span class="spacer"></span><button class="btn sm" id="bnCopy">Copy &amp; edit</button><button class="btn sm" id="bnMine">My layout</button>`;
+    b.style.display = 'flex';
+  } else b.style.display = 'none';
+  $('#legend').style.top = (ro() ? b.offsetHeight + 10 : 10) + 'px';
+}
+function openSource(src){
+  source = src;
+  if (src === 'mine'){ if (!mine) mine = defaultState(); S = mine; }
+  else S = clone(src === 'published' ? published : sharedData);
+  selectedId = null; setMode('view');
+  curAlliance = S.alliances[0]?.id;
+  renderSource(); renderAll();
+}
+$('#srcSel').addEventListener('change', e => openSource(e.target.value));
+$('#banner').addEventListener('click', e => {
+  if (e.target.id === 'bnMine') openSource('mine');
+  if (e.target.id === 'bnCopy'){
+    if (mine && mine.items.length && !confirm('This will replace your current layout. Continue?\n今の自分の配置は上書きされます。よろしいですか？')) return;
+    mine = clone(S);
+    mine.items.forEach(i => i.id = uid());
+    source = 'mine'; S = mine; save();
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    sharedData = null;
+    renderSource(); renderAll(); toast('Copied. You can edit it now. / コピーしました');
+  }
+});
+
+function renderAll(){ compute(); renderGrid(); renderTerr(); renderCrys(); renderMarks(); renderPanel(); renderCard(); }
+function changed(){ save(); renderAll(); }
+
+/* ===== 表示（拡大・移動） ===== */
+const vp = $('#viewport'), world = $('#world');
+const view = {s:1, tx:0, ty:0};
+let rescaleQueued = false;
+function applyView(){
+  world.style.transform = `translate(${view.tx}px,${view.ty}px) scale(${view.s})`;
+  vp.classList.toggle('zhi', view.s > 4);
+  if (!rescaleQueued){ rescaleQueued = true; requestAnimationFrame(() => { rescaleQueued = false; rescaleMarks(); }); }
+}
+function fitScale(){ const r = vp.getBoundingClientRect(); return Math.min(r.width, r.height) / MAP_SIZE * 0.98; }
+function fit(){ const r = vp.getBoundingClientRect(); view.s = fitScale(); view.tx = (r.width - MAP_SIZE*view.s)/2; view.ty = (r.height - MAP_SIZE*view.s)/2; applyView(); }
+function zoomAt(px, py, factor){
+  const s2 = clamp(view.s*factor, fitScale()*0.5, 40); const f = s2/view.s;
+  view.tx = px - (px - view.tx)*f; view.ty = py - (py - view.ty)*f; view.s = s2; applyView();
+}
+function centerOn(gx, gy, minScale){
+  const r = vp.getBoundingClientRect();
+  if (minScale && view.s < minScale) view.s = minScale;
+  view.tx = r.width/2 - (gx+.5)*view.s; view.ty = r.height/2 - sy(gy+.5)*view.s; applyView();
+}
+function localPt(e){ const r = vp.getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; }
+function toGame(p){ const ux = (p.x - view.tx)/view.s, uy = (p.y - view.ty)/view.s; return {x:ux, y:MAP_SIZE-uy}; }
+function toTile(p){ const g = toGame(p); return {x:clamp(Math.floor(g.x),0,MAP_SIZE-1), y:clamp(Math.floor(g.y),0,MAP_SIZE-1), inside: g.x>=0&&g.x<MAP_SIZE&&g.y>=0&&g.y<MAP_SIZE}; }
+function showCoord(t){ $('#coord').textContent = t && t.inside ? `X ${t.x} / Y ${t.y}` : 'X — / Y —'; }
+
+// タップ位置にある配置物を探す（アイコン優先 → 領土）
+function hitItem(p){
+  let best = null, bd = 1e9;
+  for (const it of S.items){
+    const sx = (it.x+.5)*view.s + view.tx, syy = sy(it.y+.5)*view.s + view.ty;
+    const d = Math.hypot(sx-p.x, syy-p.y);
+    if (d < 16 && d < bd){ bd = d; best = it; }
+  }
+  if (best) return {it:best, icon:true};
+  const t = toTile(p);
+  let cand = null; bd = 1e9;
+  for (const it of S.items){
+    if (inRect(rectOf(it), t.x, t.y)){ const d = Math.hypot(it.x-t.x, it.y-t.y); if (d < bd){ bd = d; cand = it; } }
+  }
+  return cand ? {it:cand, icon:false} : null;
+}
+
+function placeAt(type, x, y){
+  if (ro()) return;
+  if (!allianceOf(curAlliance)){ toast('Add an alliance first / 先に同盟を追加してください'); return; }
+  if (type==='fort' && S.items.filter(i => i.a===curAlliance && i.type==='fort').length >= S.settings.maxAF){
+    toast(`Max ${S.settings.maxAF} AFs per alliance (AF1 & AF2) / 要塞は1同盟${S.settings.maxAF}つまで`); return;
+  }
+  const it = snapItem({id:uid(), type, a:curAlliance, x:clamp(x,0,MAP_SIZE-1), y:clamp(y,0,MAP_SIZE-1)});
+  if (it.x!==x || it.y!==y) toast(`${type==='flag'?'Flags':'AFs'} snap to every ${S.settings.flagStep} tiles → placed at (${it.x}, ${it.y})`);
+  S.items.push(it); selectedId = it.id; changed();
+  if (type==='flag' && !D.valid.get(it.id)) setTimeout(()=>toast('This Flag is not connected to your territory (inactive) / 領土と繋がっていないため無効です'), 50);
+}
+function onTap(p){
+  const t = toTile(p);
+  if (!t.inside) { selectedId = null; renderAll(); return; }
+  if (mode==='fort' || mode==='flag'){ placeAt(mode, t.x, t.y); return; }
+  const hit = hitItem(p);
+  if (mode==='del' && !ro()){ if (hit){ S.items = S.items.filter(i => i!==hit.it); if (selectedId===hit.it.id) selectedId=null; changed(); } return; }
+  selectedId = hit ? hit.it.id : null; renderAll();
+}
+
+const pts = new Map(); let gest = null;
+vp.addEventListener('pointerdown', e => {
+  if (e.target.closest('#card,#panel,#banner')) return;
+  vp.setPointerCapture(e.pointerId);
+  const p = localPt(e); pts.set(e.pointerId, p);
+  if (pts.size === 1){
+    const hit = mode==='view' && !ro() ? hitItem(p) : null;
+    if (hit && hit.icon) gest = {type:'drag', it:hit.it, sx:p.x, sy:p.y, moved:false};
+    else gest = {type:'pan', sx:p.x, sy:p.y, tx:view.tx, ty:view.ty, moved:false};
+    if (gest.type==='pan') vp.style.cursor = 'grabbing';
+  } else if (pts.size === 2){
+    const [a,b] = [...pts.values()];
+    gest = {type:'pinch', d:Math.hypot(a.x-b.x,a.y-b.y)||1, s:view.s, tx:view.tx, ty:view.ty, cx:(a.x+b.x)/2, cy:(a.y+b.y)/2, moved:true};
+  }
+});
+vp.addEventListener('pointermove', e => {
+  if (e.target.closest('#card,#panel,#banner') && !pts.has(e.pointerId)) return;
+  const p = localPt(e);
+  const t = toTile(p); showCoord(t);
+  if (!pts.has(e.pointerId)){ if (e.pointerType==='mouse') renderGhost(t.inside ? t : null); return; }
+  pts.set(e.pointerId, p);
+  if (!gest) return;
+  if (gest.type==='pan'){
+    const dx = p.x-gest.sx, dy = p.y-gest.sy;
+    if (!gest.moved && Math.hypot(dx,dy) > 6) gest.moved = true;
+    if (gest.moved){ view.tx = gest.tx+dx; view.ty = gest.ty+dy; applyView(); }
+  } else if (gest.type==='drag'){
+    if (!gest.moved && Math.hypot(p.x-gest.sx,p.y-gest.sy) > 4){ gest.moved = true; selectedId = gest.it.id; }
+    if (gest.moved){ const nx = snaps(gest.it) ? snapCoord(t.x,S.settings) : t.x, ny = snaps(gest.it) ? snapCoord(t.y,S.settings) : t.y; if (gest.it.x!==nx || gest.it.y!==ny){ gest.it.x = nx; gest.it.y = ny; renderAll(); } }
+  } else if (gest.type==='pinch' && pts.size>=2){
+    const [a,b] = [...pts.values()];
+    const d = Math.hypot(a.x-b.x,a.y-b.y)||1, cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
+    const s2 = clamp(gest.s*d/gest.d, fitScale()*0.5, 40), f = s2/gest.s;
+    view.s = s2; view.tx = cx - (gest.cx-gest.tx)*f; view.ty = cy - (gest.cy-gest.ty)*f; applyView();
+  }
+});
+function endPointer(e){
+  if (!pts.has(e.pointerId)) return;
+  pts.delete(e.pointerId);
+  vp.style.cursor = '';
+  if (!gest) return;
+  if (gest.type==='pan' && !gest.moved && pts.size===0) onTap(localPt(e));
+  if (gest.type==='drag'){ if (gest.moved) changed(); else onTap(localPt(e)); }
+  if (pts.size === 1){ const p = [...pts.values()][0]; gest = {type:'pan', sx:p.x, sy:p.y, tx:view.tx, ty:view.ty, moved:true}; }
+  else if (pts.size === 0) gest = null;
+}
+vp.addEventListener('pointerup', endPointer);
+vp.addEventListener('pointercancel', endPointer);
+vp.addEventListener('pointerleave', e => { if (e.pointerType==='mouse' && !pts.size){ renderGhost(null); } });
+vp.addEventListener('wheel', e => { if (e.target.closest('#panel,#card,#banner')) return; e.preventDefault(); const p = localPt(e); zoomAt(p.x, p.y, Math.exp(-e.deltaY*0.0015)); }, {passive:false});
+window.addEventListener('resize', () => applyView());
+
+/* ===== UI ===== */
+function setMode(m){
+  mode = m;
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode===m));
+  vp.classList.toggle('placing', m==='fort'||m==='flag'||m==='del');
+  renderGhost(null);
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+$('#allianceSel').addEventListener('change', e => { curAlliance = e.target.value; e.target.style.borderLeftColor = allianceOf(curAlliance)?.color || ''; });
+$('#btnFit').addEventListener('click', fit);
+$('#btnMenu').addEventListener('click', () => $('#panel').classList.toggle('open'));
+$('#closePanel').addEventListener('click', () => $('#panel').classList.remove('open'));
+
+$('#btnPlace').addEventListener('click', () => {
+  const x = toInt($('#inX').value, NaN), y = toInt($('#inY').value, NaN);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x<0 || y<0 || x>=MAP_SIZE || y>=MAP_SIZE){ toast('Enter coordinates 0–1199 / 座標は0〜1199'); return; }
+  placeAt($('#inType').value, x, y); const pl = S.items[S.items.length-1]; if (pl) centerOn(pl.x, pl.y, Math.max(view.s, 2));
+});
+function addAlliance(){
+  if (ro()) return;
+  const name = prompt('Alliance name / 同盟名 (e.g. 62Ys)', ''); if (!name) return;
+  const used = new Set(S.alliances.map(a => a.color.toLowerCase()));
+  const color = PALETTE.find(c => !used.has(c)) || '#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+  const id = 'a' + Date.now().toString(36);
+  S.alliances.push({id, name:name.slice(0,30), color});
+  curAlliance = id; changed(); toast(`Added ${name}. Select it in the bottom bar to place its AFs and Flags.`);
+}
+$('#btnAddAlliance').addEventListener('click', addAlliance);
+$('#btnQuickAlliance').addEventListener('click', addAlliance);
+$('#allianceList').addEventListener('click', e => {
+  if (ro()) return;
+  const rn = e.target.dataset.arename, dl = e.target.dataset.adel;
+  if (rn){ const a = allianceOf(rn); const n = prompt('Alliance name / 同盟名', a.name); if (n){ a.name = n.slice(0,30); changed(); } }
+  if (dl){
+    const a = allianceOf(dl); const n = S.items.filter(i => i.a===dl).length;
+    if (!confirm(`Delete ${a.name}?${n?`\nIts ${n} AF/Flag(s) will also be removed.`:''}\n削除しますか？`)) return;
+    S.alliances = S.alliances.filter(x => x.id!==dl); S.items = S.items.filter(i => i.a!==dl);
+    if (!S.alliances.length) S.alliances.push({id:'a1', name:'62Ys', color:PALETTE[0]});
+    changed();
+  }
+});
+$('#allianceList').addEventListener('input', e => { if (ro()) return; const id = e.target.dataset.acolor; if (id){ allianceOf(id).color = e.target.value; changed(); } });
+$('#itemList').addEventListener('click', e => {
+  const id = e.target.dataset.goto; if (!id) return;
+  const it = S.items.find(i => i.id===id); selectedId = id; renderAll(); centerOn(it.x, it.y, 3);
+  if (innerWidth <= 640) $('#panel').classList.remove('open');
+});
+$('#lyCrys').addEventListener('change', e => { L.crystals = e.target.checked; saveLayers(); renderAll(); });
+$('#lyLabels').addEventListener('change', e => { L.labels = e.target.checked; saveLayers(); renderAll(); });
+$('#lyGrid').addEventListener('change', e => { L.grid = e.target.checked; saveLayers(); renderAll(); });
+$('#lyLegend').addEventListener('change', e => { L.legend = e.target.checked; saveLayers(); renderAll(); });
+$('#stFort').addEventListener('change', e => { S.settings.fortR = clamp(toInt(e.target.value,7),0,100); changed(); });
+$('#stMaxAF').addEventListener('change', e => { S.settings.maxAF = clamp(toInt(e.target.value,2),1,10); changed(); });
+$('#stFlag').addEventListener('change', e => { S.settings.flagR = clamp(toInt(e.target.value,4),0,100); changed(); });
+$('#stDiag').addEventListener('change', e => { S.settings.diag = e.target.checked; changed(); });
+$('#stSnapAF').addEventListener('change', e => { S.settings.snapAF = e.target.checked; resnap(); });
+function resnap(){ S.settings.flagOff %= S.settings.flagStep; S.items.forEach(i => snapItem(i)); changed(); }
+$('#stStep').addEventListener('change', e => { S.settings.flagStep = clamp(toInt(e.target.value,3),1,50); resnap(); });
+$('#stOff').addEventListener('change', e => { S.settings.flagOff = clamp(toInt(e.target.value,1),0,49); resnap(); });
+
+$('#card').addEventListener('click', e => {
+  const it = S.items.find(i => i.id===selectedId); if (!it) return;
+  if (e.target.id==='cClose'){ selectedId = null; renderAll(); return; }
+  if (ro()) return;
+  if (e.target.id==='cDel'){ S.items = S.items.filter(i => i!==it); selectedId = null; changed(); }
+  else if (e.target.dataset.nudge){ const k = snaps(it) ? S.settings.flagStep : 1; const [dx,dy] = e.target.dataset.nudge.split(',').map(Number); it.x = clamp(it.x+dx*k,0,MAP_SIZE-1); it.y = clamp(it.y+dy*k,0,MAP_SIZE-1); snapItem(it); changed(); }
+});
+$('#card').addEventListener('change', e => {
+  const it = S.items.find(i => i.id===selectedId); if (!it || ro()) return;
+  if (e.target.id==='cX') it.x = clamp(toInt(e.target.value,it.x),0,MAP_SIZE-1);
+  if (e.target.id==='cY') it.y = clamp(toInt(e.target.value,it.y),0,MAP_SIZE-1);
+  snapItem(it); changed();
+});
+
+function exportData(){ return {v:1, alliances:S.alliances, items:S.items, settings:S.settings}; }
+async function copyText(text, okMsg){
+  try{ await navigator.clipboard.writeText(text); toast(okMsg); }
+  catch(e){ prompt('Copy this / コピーしてください', text); }
+}
+$('#btnShare').addEventListener('click', async () => {
+  const url = location.origin + location.pathname + location.search + '#' + await encodeShare(S);
+  copyText(url, 'View-only link copied / 閲覧用URLをコピーしました');
+});
+$('#btnExport').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(exportData(), null, 1)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'layout.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#btnImport').addEventListener('click', () => {
+  if (ro()) return;
+  try{ S = sanitize(JSON.parse($('#importText').value)); mine = S; selectedId = null; changed(); toast('Loaded / 読み込みました'); }
+  catch(e){ toast('Invalid JSON / JSONの形式が正しくありません'); }
+});
+$('#btnClear').addEventListener('click', () => { if (!ro() && confirm('Clear all AFs and Flags? / すべて消しますか？')){ S.items = []; selectedId = null; changed(); } });
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea,select')) return;
+  if (e.key==='Escape'){ selectedId = null; setMode('view'); renderAll(); }
+  if ((e.key==='Delete'||e.key==='Backspace') && selectedId && !ro()){ S.items = S.items.filter(i => i.id!==selectedId); selectedId = null; changed(); }
+});
+
+/* ===== 起動 ===== */
+const img = $('#mapimg');
+img.onerror = () => { $('#nomap').style.display = 'flex'; img.style.display = 'none'; };
+img.src = MAP_IMAGE;
+window.addEventListener('hashchange', () => location.reload());
+(async () => {
+  mine = loadMine();
+  if (location.hash.length > 3){
+    try{ sharedData = sanitize(await decodeShare(location.hash)); }
+    catch(e){ toast('Could not open the shared link / 閲覧用URLを読み込めませんでした'); }
+  }
+  try{ const r = await fetch('layout.json', {cache:'no-cache'}); if (r.ok) published = sanitize(await r.json()); }catch(e){}
+  fit();
+  if (sharedData) openSource('shared');
+  else if (mine && mine.items.length) openSource('mine');
+  else if (published) openSource('published');
+  else openSource('mine');
+})();
+</script>
+</body>
+</html>
