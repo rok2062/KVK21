@@ -24,6 +24,8 @@ header h1{font-size:15px;margin:0;font-weight:700;white-space:nowrap}
 #svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 #nomap{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;color:var(--muted);
   background:repeating-linear-gradient(45deg,#1a2026 0 20px,#161b20 20px 40px);font-size:40px;line-height:1.6;padding:40px}
+#gMark{display:none}
+#viewport.icons #gMark{display:inline}
 .grid10{display:none}
 #viewport.zhi .grid10{display:inline}
 
@@ -140,7 +142,9 @@ body.ro .edit{display:none!important}
         <section>
           <h2>Display / 表示</h2>
           <label class="chk"><input type="checkbox" id="lyCrys"> Crystals / 水晶</label>
-          <label class="chk"><input type="checkbox" id="lyLabels"> AF labels / 要塞の名前</label>
+          <label class="chk"><input type="checkbox" id="lyLabels"> Labels when zoomed in / 拡大時の名前</label>
+          <div class="line">Fill strength / 塗りの濃さ <input type="range" id="lyFill" min="0.15" max="0.8" step="0.05" style="flex:1"></div>
+          <div class="muted">Icons for AFs and Flags appear only when zoomed in. Darker areas are AF territory.<br>要塞と旗のアイコンは拡大したときだけ表示されます。濃い部分が要塞の領土です。</div>
           <label class="chk"><input type="checkbox" id="lyLegend"> Legend / 凡例</label>
           <label class="chk"><input type="checkbox" id="lyGrid"> Grid (100, 10 when zoomed) / グリッド</label>
         </section>
@@ -216,7 +220,7 @@ function defaultState(){
 let S = defaultState();
 // 表示設定（配置データとは別に保存）
 const LAYER_KEY = 'base-sim-layers';
-let L = {crystals:true, labels:true, grid:false, legend:true};
+let L = {crystals:true, labels:true, grid:false, legend:true, fillOpacity:.5};
 try{ Object.assign(L, JSON.parse(localStorage.getItem(LAYER_KEY) || '{}')); }catch(e){}
 function saveLayers(){ try{ localStorage.setItem(LAYER_KEY, JSON.stringify(L)); }catch(e){} }
 // 表示中のデータの出どころ：mine=自分の配置（編集可） / published=公開版 / shared=閲覧用URL
@@ -351,18 +355,42 @@ function compute(){
   });
   // 有効領土のマス数（重なりは1回だけ数える）
   const bm = new Uint8Array(MAP_SIZE*MAP_SIZE);
+  const outline = new Map();
+  const N = MAP_SIZE, at = (x,y) => (x>=0 && y>=0 && x<N && y<N) ? bm[y*N+x] : 0;
   for (const a of S.alliances){
-    bm.fill(0); let n = 0;
+    bm.fill(0); let n = 0, bx0=N, bx1=-1, by0=N, by1=-1;
     for (const {it,r,ok} of rects){
       if (it.a!==a.id || !ok) continue;
-      const x0=clamp(r.x0,0,MAP_SIZE-1), x1=clamp(r.x1,0,MAP_SIZE-1), y0=clamp(r.y0,0,MAP_SIZE-1), y1=clamp(r.y1,0,MAP_SIZE-1);
-      for (let y=y0;y<=y1;y++){ const row=y*MAP_SIZE; for(let x=x0;x<=x1;x++){ if(!bm[row+x]){ bm[row+x]=1; n++; } } }
+      const x0=clamp(r.x0,0,N-1), x1=clamp(r.x1,0,N-1), y0=clamp(r.y0,0,N-1), y1=clamp(r.y1,0,N-1);
+      bx0=Math.min(bx0,x0); bx1=Math.max(bx1,x1); by0=Math.min(by0,y0); by1=Math.max(by1,y1);
+      for (let y=y0;y<=y1;y++){ const row=y*N; for(let x=x0;x<=x1;x++){ if(!bm[row+x]){ bm[row+x]=1; n++; } } }
     }
     stats.get(a.id).tiles = n;
+    // 領土の外周線（同盟の領土をひとつの形として囲む）
+    let d = '';
+    if (n){
+      for (let y=by0; y<=by1+1; y++){           // 横線：マス(x,y-1)と(x,y)の境目
+        let run = -1;
+        for (let x=bx0; x<=bx1+1; x++){
+          const e = x<=bx1 && at(x,y)!==at(x,y-1);
+          if (e && run<0) run = x;
+          if (!e && run>=0){ d += `M${run} ${N-y}H${x}`; run = -1; }
+        }
+      }
+      for (let x=bx0; x<=bx1+1; x++){           // 縦線：マス(x-1,y)と(x,y)の境目
+        let run = -1;
+        for (let y=by0; y<=by1+1; y++){
+          const e = y<=by1 && at(x,y)!==at(x-1,y);
+          if (e && run<0) run = y;
+          if (!e && run>=0){ d += `M${x} ${N-run}V${N-y}`; run = -1; }
+        }
+      }
+    }
+    outline.set(a.id, d);
   }
   const afNo = new Map(), cnt = {};
   for (const it of S.items) if (it.type==='fort'){ cnt[it.a] = (cnt[it.a]||0) + 1; afNo.set(it.id, cnt[it.a]); }
-  D = {valid, itemCrys, crysOwner, stats, afNo};
+  D = {valid, itemCrys, crysOwner, stats, afNo, outline};
 }
 
 /* ===== 描画 ===== */
@@ -385,20 +413,24 @@ function renderGrid(){
   }
   $('#gGrid').innerHTML = h;
 }
+// 領土は同盟ごとに色で塗る（重なっても濃くならないようグループ単位で半透明に）
+const rectSvg = (r, attrs) => `<rect x="${r.x0}" y="${sy(r.y1+1)}" width="${r.x1-r.x0+1}" height="${r.y1-r.y0+1}" ${attrs}/>`;
 function renderTerr(){
   let h = '';
-  // 無効 → 有効 → 選択中 の順に重ねる
-  const order = [...S.items].sort((a,b) => (D.valid.get(a.id)?1:0)-(D.valid.get(b.id)?1:0) || (a.type==='fort'?-1:1));
-  for (const it of order){
-    const al = allianceOf(it.a); const r = rectOf(it); const ok = D.valid.get(it.id);
-    const x=r.x0, y=sy(r.y1+1), w=r.x1-r.x0+1;
-    const sel = it.id===selectedId;
-    if (ok){
-      h += `<rect x="${x}" y="${y}" width="${w}" height="${w}" fill="${al.color}" fill-opacity="${it.type==='fort'?.30:.20}" stroke="${sel?'#fff':al.color}" stroke-width="${sel?2.5:1.5}" vector-effect="non-scaling-stroke"/>`;
-    } else {
-      h += `<rect x="${x}" y="${y}" width="${w}" height="${w}" fill="#888" fill-opacity=".15" stroke="${sel?'#fff':'#ef5a52'}" stroke-width="${sel?2.5:1.5}" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>`;
-    }
+  for (const a of S.alliances){
+    const its = S.items.filter(i => i.a===a.id && D.valid.get(i.id));
+    if (!its.length) continue;
+    h += `<g opacity="${L.fillOpacity}">` + its.map(i => rectSvg(rectOf(i), `fill="${a.color}"`)).join('') + '</g>';
+    const afs = its.filter(i => i.type==='fort');
+    if (afs.length) h += `<g opacity=".28">` + afs.map(i => rectSvg(rectOf(i), `fill="${a.color}"`)).join('') + '</g>';
+    h += `<path d="${D.outline.get(a.id)}" fill="none" stroke="${a.color}" stroke-width="2" stroke-linecap="square" vector-effect="non-scaling-stroke"/>`;
   }
+  for (const it of S.items){
+    if (D.valid.get(it.id)) continue;
+    h += rectSvg(rectOf(it), `fill="#ef5a52" fill-opacity=".12" stroke="#ef5a52" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"`);
+  }
+  const sel = S.items.find(i => i.id===selectedId);
+  if (sel) h += rectSvg(rectOf(sel), `fill="none" stroke="#fff" stroke-width="2.5" vector-effect="non-scaling-stroke"`);
   $('#gTerr').innerHTML = h;
 }
 function renderCrys(){
@@ -413,7 +445,7 @@ function renderCrys(){
   });
   $('#gCrys').innerHTML = h;
 }
-function markerScale(){ return (1.3/view.s) * (view.s < 0.8 ? 0.75 : 1); }
+function markerScale(){ return 1.05/view.s; }
 function renderMarks(){
   const k = markerScale();
   let h = '';
@@ -487,7 +519,7 @@ function renderPanel(){
       <button class="btn sm" data-goto="${esc(it.id)}">Show</button></div>`;
   }).join('') : '<div class="muted">Nothing placed yet / まだ何もありません</div>';
   // 表示・設定
-  $('#lyCrys').checked = L.crystals; $('#lyLabels').checked = L.labels; $('#lyGrid').checked = L.grid; $('#lyLegend').checked = L.legend;
+  $('#lyCrys').checked = L.crystals; $('#lyLabels').checked = L.labels; $('#lyGrid').checked = L.grid; $('#lyFill').value = L.fillOpacity; $('#lyLegend').checked = L.legend;
   $('#stFort').value = S.settings.fortR; $('#stMaxAF').value = S.settings.maxAF; $('#stFlag').value = S.settings.flagR; $('#stDiag').checked = S.settings.diag; $('#stSnapAF').checked = S.settings.snapAF; $('#stStep').value = S.settings.flagStep; $('#stOff').value = S.settings.flagOff;
 }
 function renderCard(){
@@ -609,9 +641,11 @@ function changed(){ save(); renderAll(); }
 const vp = $('#viewport'), world = $('#world');
 const view = {s:1, tx:0, ty:0};
 let rescaleQueued = false;
+const ICON_ZOOM = 3;   // これ以上拡大したときだけアイコンを表示
 function applyView(){
   world.style.transform = `translate(${view.tx}px,${view.ty}px) scale(${view.s})`;
   vp.classList.toggle('zhi', view.s > 4);
+  vp.classList.toggle('icons', view.s >= ICON_ZOOM);
   if (!rescaleQueued){ rescaleQueued = true; requestAnimationFrame(() => { rescaleQueued = false; rescaleMarks(); }); }
 }
 function fitScale(){ const r = vp.getBoundingClientRect(); return Math.min(r.width, r.height) / MAP_SIZE * 0.98; }
@@ -633,7 +667,7 @@ function showCoord(t){ $('#coord').textContent = t && t.inside ? `X ${t.x} / Y $
 // タップ位置にある配置物を探す（アイコン優先 → 領土）
 function hitItem(p){
   let best = null, bd = 1e9;
-  for (const it of S.items){
+  if (view.s >= ICON_ZOOM) for (const it of S.items){
     const sx = (it.x+.5)*view.s + view.tx, syy = sy(it.y+.5)*view.s + view.ty;
     const d = Math.hypot(sx-p.x, syy-p.y);
     if (d < 16 && d < bd){ bd = d; best = it; }
@@ -769,6 +803,7 @@ $('#itemList').addEventListener('click', e => {
 $('#lyCrys').addEventListener('change', e => { L.crystals = e.target.checked; saveLayers(); renderAll(); });
 $('#lyLabels').addEventListener('change', e => { L.labels = e.target.checked; saveLayers(); renderAll(); });
 $('#lyGrid').addEventListener('change', e => { L.grid = e.target.checked; saveLayers(); renderAll(); });
+$('#lyFill').addEventListener('input', e => { L.fillOpacity = +e.target.value; saveLayers(); renderTerr(); });
 $('#lyLegend').addEventListener('change', e => { L.legend = e.target.checked; saveLayers(); renderAll(); });
 $('#stFort').addEventListener('change', e => { S.settings.fortR = clamp(toInt(e.target.value,7),0,100); changed(); });
 $('#stMaxAF').addEventListener('change', e => { S.settings.maxAF = clamp(toInt(e.target.value,2),1,10); changed(); });

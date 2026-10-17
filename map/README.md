@@ -6,7 +6,7 @@ Place Alliance Fortresses (AF) and Flags on the map to check territory connectio
 
 ## ファイル
 - `index.html` … シミュレーター本体
-- `map.jpg` … マップ画像（正方形ならサイズは自由。高解像度に差し替えると拡大時にきれいになります）
+- `map.jpg` … マップ画像（4096px。スマホでも重くならないサイズ）
 - `crystals.js` … 水晶の座標（1670か所、ゲーム座標）
 - `extract.html` … 赤丸画像から crystals.js を作り直すツール（水晶の位置が変わったとき用）
 
@@ -37,6 +37,7 @@ Place Alliance Fortresses (AF) and Flags on the map to check territory connectio
 - 旗は要塞の領土、または有効な旗の領土に重なるか接している場合に有効
 
 ## 操作
+- 領土は同盟の色で塗られます。濃い部分が要塞の領土です。要塞・旗のアイコンは拡大したときだけ表示されます
 - ドラッグで移動、ホイール／ピンチで拡大縮小
 - 「AF」「Flag」を選んでタップで配置、「選択・移動」でアイコンをドラッグして移動
 - メニューから座標指定での配置、同盟の追加、共有URLのコピーができます
