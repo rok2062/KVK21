@@ -26,6 +26,7 @@ header h1{font-size:15px;margin:0;font-weight:700;white-space:nowrap}
   background:repeating-linear-gradient(45deg,#1a2026 0 20px,#161b20 20px 40px);font-size:40px;line-height:1.6;padding:40px}
 #gMark{display:none}
 #viewport.icons #gMark{display:inline}
+#viewport.icons #gLabel{display:none}
 .grid10{display:none}
 #viewport.zhi .grid10{display:inline}
 
@@ -106,6 +107,7 @@ body.ro .edit{display:none!important}
         <g id="gCrys"></g>
         <g id="gGhost"></g>
         <g id="gMark"></g>
+        <g id="gLabel"></g>
       </svg>
     </div>
     <div id="banner"></div>
@@ -143,6 +145,7 @@ body.ro .edit{display:none!important}
           <h2>Display / 表示</h2>
           <label class="chk"><input type="checkbox" id="lyCrys"> Crystals / 水晶</label>
           <label class="chk"><input type="checkbox" id="lyLabels"> Labels when zoomed in / 拡大時の名前</label>
+          <label class="chk"><input type="checkbox" id="lyTerrLabels"> Alliance names on territory / 領土に同盟名</label>
           <div class="line">Fill strength / 塗りの濃さ <input type="range" id="lyFill" min="0.15" max="0.8" step="0.05" style="flex:1"></div>
           <div class="muted">Icons for AFs and Flags appear only when zoomed in. Darker areas are AF territory.<br>要塞と旗のアイコンは拡大したときだけ表示されます。濃い部分が要塞の領土です。</div>
           <label class="chk"><input type="checkbox" id="lyLegend"> Legend / 凡例</label>
@@ -220,7 +223,7 @@ function defaultState(){
 let S = defaultState();
 // 表示設定（配置データとは別に保存）
 const LAYER_KEY = 'base-sim-layers';
-let L = {crystals:true, labels:true, grid:false, legend:true, fillOpacity:.5};
+let L = {crystals:true, labels:true, grid:false, legend:true, fillOpacity:.5, terrLabels:true};
 try{ Object.assign(L, JSON.parse(localStorage.getItem(LAYER_KEY) || '{}')); }catch(e){}
 function saveLayers(){ try{ localStorage.setItem(LAYER_KEY, JSON.stringify(L)); }catch(e){} }
 // 表示中のデータの出どころ：mine=自分の配置（編集可） / published=公開版 / shared=閲覧用URL
@@ -390,7 +393,28 @@ function compute(){
   }
   const afNo = new Map(), cnt = {};
   for (const it of S.items) if (it.type==='fort'){ cnt[it.a] = (cnt[it.a]||0) + 1; afNo.set(it.id, cnt[it.a]); }
-  D = {valid, itemCrys, crysOwner, stats, afNo, outline};
+  // 繋がった領土のかたまりごとに同盟名ラベルの位置を決める
+  const labels = [];
+  for (const a of S.alliances){
+    const its = S.items.filter(i => i.a===a.id && valid.get(i.id));
+    const seen = new Set();
+    for (const st of its){
+      if (seen.has(st.id)) continue;
+      const comp = [st]; seen.add(st.id);
+      for (let k=0; k<comp.length; k++){
+        const rc = rectOf(comp[k]);
+        for (const o of its) if (!seen.has(o.id) && adjacent(rc, rectOf(o))){ seen.add(o.id); comp.push(o); }
+      }
+      const af = comp.find(i => i.type==='fort');
+      let pos = af;
+      if (!pos){
+        const mx = comp.reduce((t,i)=>t+i.x,0)/comp.length, my = comp.reduce((t,i)=>t+i.y,0)/comp.length;
+        pos = comp.reduce((b,i) => Math.hypot(i.x-mx,i.y-my) < Math.hypot(b.x-mx,b.y-my) ? i : b);
+      }
+      labels.push({name:a.name, color:a.color, x:pos.x+.5, y:pos.y+.5});
+    }
+  }
+  D = {valid, itemCrys, crysOwner, stats, afNo, outline, labels};
 }
 
 /* ===== 描画 ===== */
@@ -470,8 +494,17 @@ function renderMarks(){
   }
   $('#gMark').innerHTML = h;
 }
+function renderLabels(){
+  if (!L.terrLabels){ $('#gLabel').innerHTML = ''; return; }
+  $('#gLabel').innerHTML = D.labels.map(l => {
+    const cx = l.x, cy = sy(l.y);
+    return `<g data-cx="${cx}" data-cy="${cy}" transform="translate(${cx} ${cy}) scale(${1/view.s})" pointer-events="none">
+      <text text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="800" fill="#fff" stroke="${l.color}" stroke-width="4" stroke-linejoin="round" paint-order="stroke">${esc(l.name)}</text></g>`;
+  }).join('');
+}
 function rescaleMarks(){
   const k = markerScale();
+  for (const g of $('#gLabel').children) g.setAttribute('transform', `translate(${g.dataset.cx} ${g.dataset.cy}) scale(${1/view.s})`);
   for (const g of $('#gMark').children) g.setAttribute('transform', `translate(${g.dataset.cx} ${g.dataset.cy}) scale(${k})`);
 }
 function renderGhost(tile){
@@ -519,7 +552,7 @@ function renderPanel(){
       <button class="btn sm" data-goto="${esc(it.id)}">Show</button></div>`;
   }).join('') : '<div class="muted">Nothing placed yet / まだ何もありません</div>';
   // 表示・設定
-  $('#lyCrys').checked = L.crystals; $('#lyLabels').checked = L.labels; $('#lyGrid').checked = L.grid; $('#lyFill').value = L.fillOpacity; $('#lyLegend').checked = L.legend;
+  $('#lyCrys').checked = L.crystals; $('#lyLabels').checked = L.labels; $('#lyGrid').checked = L.grid; $('#lyTerrLabels').checked = L.terrLabels; $('#lyFill').value = L.fillOpacity; $('#lyLegend').checked = L.legend;
   $('#stFort').value = S.settings.fortR; $('#stMaxAF').value = S.settings.maxAF; $('#stFlag').value = S.settings.flagR; $('#stDiag').checked = S.settings.diag; $('#stSnapAF').checked = S.settings.snapAF; $('#stStep').value = S.settings.flagStep; $('#stOff').value = S.settings.flagOff;
 }
 function renderCard(){
@@ -634,7 +667,7 @@ $('#banner').addEventListener('click', e => {
   }
 });
 
-function renderAll(){ compute(); renderGrid(); renderTerr(); renderCrys(); renderMarks(); renderPanel(); renderCard(); }
+function renderAll(){ compute(); renderLabels(); renderGrid(); renderTerr(); renderCrys(); renderMarks(); renderPanel(); renderCard(); }
 function changed(){ save(); renderAll(); }
 
 /* ===== 表示（拡大・移動） ===== */
@@ -804,6 +837,7 @@ $('#lyCrys').addEventListener('change', e => { L.crystals = e.target.checked; sa
 $('#lyLabels').addEventListener('change', e => { L.labels = e.target.checked; saveLayers(); renderAll(); });
 $('#lyGrid').addEventListener('change', e => { L.grid = e.target.checked; saveLayers(); renderAll(); });
 $('#lyFill').addEventListener('input', e => { L.fillOpacity = +e.target.value; saveLayers(); renderTerr(); });
+$('#lyTerrLabels').addEventListener('change', e => { L.terrLabels = e.target.checked; saveLayers(); renderAll(); });
 $('#lyLegend').addEventListener('change', e => { L.legend = e.target.checked; saveLayers(); renderAll(); });
 $('#stFort').addEventListener('change', e => { S.settings.fortR = clamp(toInt(e.target.value,7),0,100); changed(); });
 $('#stMaxAF').addEventListener('change', e => { S.settings.maxAF = clamp(toInt(e.target.value,2),1,10); changed(); });
