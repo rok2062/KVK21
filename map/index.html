@@ -82,6 +82,24 @@ label.chk{display:flex;gap:8px;align-items:center;margin:6px 0;cursor:pointer}
 body.ro .edit{display:none!important}
 #srcSel{padding:4px 6px;font-size:13px}
 #allianceSel{border-left-width:6px}
+.btn.share{background:#2b5d3a;border-color:#3f8a55;font-weight:700}
+.btn.big{padding:11px 16px;font-size:15px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06222a;font-weight:700}
+.dlg{position:fixed;inset:0;z-index:20;background:#000a;display:flex;align-items:center;justify-content:center;padding:12px}
+.dlg[hidden]{display:none}
+.dlg-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;width:min(520px,100%);max-height:100%;display:flex;flex-direction:column;box-shadow:0 10px 40px #000a}
+.dlg-head{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);font-size:16px}
+.dlg-body{overflow-y:auto;padding:6px 14px 16px}
+.step{border-bottom:1px solid var(--line);padding:12px 0}
+.step:last-child{border-bottom:0}
+.step-t,.step summary{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.step p,.step li{line-height:1.5;margin:6px 0}
+.step ol{padding-left:20px;margin:8px 0}
+.num{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#06222a;align-items:center;justify-content:center;font-size:13px;flex:none}
+.jp{color:var(--muted);font-size:13px}
+.hint{color:var(--muted);font-size:12px}
+#shareUrl{margin-top:6px;font-size:12px}
+#banner .btn.primary{color:#06222a}
 @media (max-width:480px){ header h1{display:none} }
 @media (max-width:640px){
   #panel{top:auto;width:100%;height:72%;border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;transform:translateY(105%)}
@@ -96,6 +114,7 @@ body.ro .edit{display:none!important}
     <h1>Territory Planner</h1>
     <select id="srcSel" title="Layout to show"></select>
     <span id="coord">X — / Y —</span>
+    <button class="btn sm share" id="btnOpenShare">📤 Share / 共有</button>
   </header>
   <div id="viewport">
     <div id="world">
@@ -158,28 +177,15 @@ body.ro .edit{display:none!important}
           <div class="line">Flag territory / 旗の領土 ±<input type="number" id="stFlag" min="0" max="100"></div>
           <div class="line">Grid step / 吸着の間隔 <input type="number" id="stStep" min="1" max="50"> offset / ずらし <input type="number" id="stOff" min="0" max="49"></div>
           <div class="muted">Step 3, offset 1 → flag centers are 1, 4, 7, 10… and a ±4 territory lines up with the 3-tile blocks (e.g. X 534–542).<br>間隔3・ずらし1なら旗の中心は 1, 4, 7, 10… になり、±4の領土が3マスのブロックにぴったり揃います（例：X 534〜542）。</div>
+          <label class="chk"><input type="checkbox" id="stStrict"> Flags only where they touch your territory (like the game) / 旗は領土に接する場所だけ（ゲームと同じ）</label>
           <label class="chk"><input type="checkbox" id="stSnapAF"> AFs use the same 3-tile grid / 要塞も同じ3マス刻みに吸着</label>
           <label class="chk"><input type="checkbox" id="stDiag"> Corner touch counts as connected / 角だけの接触も隣接とみなす</label>
           <div class="muted">A Flag is active when its territory overlaps or touches an AF or another active Flag of the same alliance.<br>旗は同じ同盟の要塞か有効な旗の領土に重なる・接する場合に有効です。</div>
         </section>
         <section>
-          <h2>Share &amp; Data / 共有・データ</h2>
-          <div class="line">
-            <button class="btn sm" id="btnShare">Copy view-only link / 閲覧用URL</button>
-            <button class="btn sm" id="btnExport">Save layout.json / 公開用に保存</button>
-          </div>
-          <div class="muted">People who open the link can only view it. To edit, they press "Copy &amp; edit" to make their own copy. The link is a snapshot.<br>閲覧用URLを開いた人は見るだけです。編集したい人は「Copy &amp; edit」で自分用に複製します。URLはコピーした時点の内容です。</div>
-          <div class="muted" style="margin-top:6px">Upload layout.json next to index.html and everyone sees it as the "Published" layout.<br>layout.json を index.html と同じフォルダに置くと、全員に「公開版」として表示されます。</div>
-          <div class="edit">
-          <div class="line"><textarea id="importText" rows="3" placeholder="Paste JSON / JSONを貼り付け"></textarea></div>
-          <div class="line">
-            <button class="btn sm" id="btnImport">Load (replace) / 置き換え</button>
-            <button class="btn sm" id="btnMergeJson">Merge / 結合</button>
-            <button class="btn sm danger" id="btnClear">Clear all / すべて消す</button>
-          </div>
-          <div class="muted">Merge matches alliances by name: an alliance in the incoming data replaces that alliance's AFs &amp; Flags in your layout; other alliances stay.<br>結合は同盟名で照合し、取り込んだ同盟の配置だけを入れ替えます。ほかの同盟はそのまま残ります。</div>
-          <div class="muted" style="margin-top:6px">Your layout is saved in this browser automatically. / 自分の配置はこのブラウザに自動保存されます。</div>
-          </div>
+          <h2>Share / 共有</h2>
+          <div class="line"><button class="btn" id="btnOpenShare2">Open Share / 共有を開く</button></div>
+          <div class="muted">Your map is saved in this browser automatically. / 自分の地図はこのブラウザに自動保存されます。</div>
         </section>
       </div>
     </aside>
@@ -194,6 +200,56 @@ body.ro .edit{display:none!important}
     <span class="spacer"></span>
     <button class="btn" id="btnFit">Fit</button>
     <button class="btn" id="btnMenu">Menu</button>
+  </div>
+</div>
+
+<div id="shareDlg" class="dlg" hidden>
+  <div class="dlg-card">
+    <div class="dlg-head"><b>Share / 共有</b><span class="spacer"></span><button class="btn sm" data-close>Close</button></div>
+    <div class="dlg-body">
+
+      <div class="step">
+        <div class="step-t"><span class="num">1</span>Send this map / この地図を送る</div>
+        <p>Send the link in Discord, LINE, etc. People who open it can <b>only look</b> — they can't change your map.<br>
+        <span class="jp">リンクをDiscordやLINEで送ります。開いた人は<b>見るだけ</b>で、あなたの地図は変わりません。</span></p>
+        <div class="line"><button class="btn big primary" id="btnNativeShare">Share link / リンクを送る</button>
+          <button class="btn big" id="btnShare">Copy link / コピー</button></div>
+        <input type="text" id="shareUrl" readonly hidden>
+        <p class="hint">If you change the map later, send a new link. / 地図を変えたら、もう一度リンクを送ってください。</p>
+      </div>
+
+      <div class="step">
+        <div class="step-t"><span class="num">2</span>Got a link? / リンクを受け取ったら</div>
+        <p>Just tap it. If it doesn't open, paste it here.<br><span class="jp">タップするだけで開きます。開かないときはここに貼り付けてください。</span></p>
+        <div class="line"><input type="text" id="pasteUrl" placeholder="Paste link here / ここに貼り付け" style="flex:1;width:auto"><button class="btn" id="btnOpenPasted">Open / 開く</button></div>
+      </div>
+
+      <details class="step">
+        <summary><span class="num">3</span>For the coordinator: combine alliances / まとめ役：同盟をまとめる</summary>
+        <ol>
+          <li>Ask each alliance leader to place <b>only their alliance</b> and send you their link.<br><span class="jp">各同盟のリーダーに、自分の同盟だけ置いてリンクを送ってもらう</span></li>
+          <li>Open each link and press <b>“Add to my map”</b>. Same alliance name = replaced with the new one; other alliances stay.<br><span class="jp">届いたリンクを開いて「Add to my map」を押す。同じ同盟名は新しい内容に入れ替わり、ほかの同盟は残ります</span></li>
+          <li>When everything is in, send your link to everyone (step 1).<br><span class="jp">全部そろったら、1の手順で全員にリンクを送る</span></li>
+        </ol>
+      </details>
+
+      <details class="step">
+        <summary><span class="num">4</span>For the site owner: show it to everyone / サイト管理者向け：全員に表示</summary>
+        <p>Save the file below and upload it next to index.html on GitHub. Everyone who opens the site sees it as “Published”.<br>
+        <span class="jp">下のファイルを保存して、GitHubの index.html と同じ場所にアップロードすると、サイトを開いた全員に「Published」として表示されます。</span></p>
+        <div class="line"><button class="btn" id="btnExport">Save layout.json / 保存</button></div>
+      </details>
+
+      <details class="step edit">
+        <summary>Advanced / 上級者向け</summary>
+        <div class="line"><textarea id="importText" rows="3" placeholder="Paste JSON / JSONを貼り付け"></textarea></div>
+        <div class="line">
+          <button class="btn sm" id="btnImport">Load (replace) / 置き換え</button>
+          <button class="btn sm" id="btnMergeJson">Merge / 結合</button>
+          <button class="btn sm danger" id="btnClear">Clear all / すべて消す</button>
+        </div>
+      </details>
+    </div>
   </div>
 </div>
 
@@ -218,7 +274,7 @@ function defaultState(){
   return { v:1,
     alliances:[{id:'a1', name:'62Ys', color:PALETTE[0]}],
     items:[],   // {id, type:'fort'|'flag', a:allianceId, x, y}
-    settings:{fortR:7, flagR:4, diag:false, flagStep:3, flagOff:1, maxAF:2, rv:2, snapAF:true} };
+    settings:{fortR:7, flagR:4, strictFlag:false, diag:false, flagStep:3, flagOff:1, maxAF:2, rv:2, snapAF:true} };
 }
 let S = defaultState();
 // 表示設定（配置データとは別に保存）
@@ -253,6 +309,7 @@ function sanitize(raw){
     s.settings.fortR = clamp(toInt(raw.settings.fortR,7),0,100);
     if (raw.settings.rv === 2) s.settings.flagR = clamp(toInt(raw.settings.flagR,4),0,100);
     s.settings.diag = !!raw.settings.diag;
+    s.settings.strictFlag = raw.settings.strictFlag === true;
     s.settings.snapAF = raw.settings.snapAF !== false;
     s.settings.maxAF = clamp(toInt(raw.settings.maxAF,2),1,10);
     s.settings.flagStep = clamp(toInt(raw.settings.flagStep,3),1,50);
@@ -282,13 +339,13 @@ function packState(st){
   const idx = new Map(st.alliances.map((a,i) => [a.id,i]));
   return {v:2, al:st.alliances.map(a => [a.name,a.color]),
     it:st.items.map(i => [i.type==='fort'?0:1, idx.get(i.a), i.x, i.y]),
-    st:[st.settings.fortR, st.settings.flagR, st.settings.diag?1:0, st.settings.flagStep, st.settings.flagOff, st.settings.maxAF, 2, st.settings.snapAF?1:0]};
+    st:[st.settings.fortR, st.settings.flagR, st.settings.diag?1:0, st.settings.flagStep, st.settings.flagOff, st.settings.maxAF, 2, st.settings.snapAF?1:0, st.settings.strictFlag?1:0]};
 }
 function unpackState(o){
   if (!o || o.v !== 2) return o;
   return { alliances:o.al.map((a,i) => ({id:'a'+(i+1), name:a[0], color:a[1]})),
     items:o.it.map((t,k) => ({id:'s'+k, type:t[0]?'flag':'fort', a:'a'+(t[1]+1), x:t[2], y:t[3]})),
-    settings:{fortR:o.st[0], flagR:o.st[1], diag:!!o.st[2], flagStep:o.st[3], flagOff:o.st[4], maxAF:o.st[5] ?? 2, rv:o.st[6] ?? 1, snapAF:o.st[7] !== 0} };
+    settings:{fortR:o.st[0], flagR:o.st[1], diag:!!o.st[2], flagStep:o.st[3], flagOff:o.st[4], maxAF:o.st[5] ?? 2, rv:o.st[6] ?? 1, snapAF:o.st[7] !== 0, strictFlag:o.st[8] === 1} };
 }
 function bytesToB64(b){ let bin=''; for (const x of b) bin += String.fromCharCode(x); return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function b64ToBytes(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
@@ -323,6 +380,27 @@ function adjacent(a, b){
   if (gy === 1 && gx <= 0) return true;
   if (S.settings.diag && gx === 1 && gy === 1) return true;
   return false;
+}
+// 旗を(x,y)に置けるか：同じ同盟の要塞か、繋がっている旗の領土に重なる・接する場所だけ（ゲームと同じ）
+function flagAllowed(aid, x, y, excludeId){
+  if (!S.settings.strictFlag) return true;
+  const its = S.items.filter(i => i.a===aid && i.id!==excludeId);
+  const ok = its.filter(i => i.type==='fort').map(rectOf);
+  let pending = its.filter(i => i.type==='flag'), grew = true;
+  while (grew && pending.length){
+    grew = false;
+    pending = pending.filter(f => { const rf = rectOf(f); if (ok.some(o => adjacent(rf,o))){ ok.push(rf); grew = true; return false; } return true; });
+  }
+  const r = rectOf({type:'flag', x, y});
+  return ok.some(o => adjacent(r, o));
+}
+const NOT_CONNECTED = 'Flags can only be placed touching your territory / 旗は自分の領土に接する場所にしか置けません';
+// 移動を試みる（旗は繋がる場所だけ）。動かせたら true
+function tryMove(it, x, y){
+  const t = snapItem({type:it.type, x:clamp(x,0,MAP_SIZE-1), y:clamp(y,0,MAP_SIZE-1)});
+  if (t.x===it.x && t.y===it.y) return false;
+  if (it.type==='flag' && !flagAllowed(it.a, t.x, t.y, it.id)) return false;
+  it.x = t.x; it.y = t.y; return true;
 }
 function inRect(r, tx, ty){ return tx>=r.x0 && tx<=r.x1 && ty>=r.y0 && ty<=r.y1; }
 
@@ -553,7 +631,7 @@ function renderPanel(){
   }).join('') : '<div class="muted">Nothing placed yet / まだ何もありません</div>';
   // 表示・設定
   $('#lyCrys').checked = L.crystals; $('#lyLabels').checked = L.labels; $('#lyGrid').checked = L.grid; $('#lyTerrLabels').checked = L.terrLabels; $('#lyFill').value = L.fillOpacity; $('#lyLegend').checked = L.legend;
-  $('#stFort').value = S.settings.fortR; $('#stMaxAF').value = S.settings.maxAF; $('#stFlag').value = S.settings.flagR; $('#stDiag').checked = S.settings.diag; $('#stSnapAF').checked = S.settings.snapAF; $('#stStep').value = S.settings.flagStep; $('#stOff').value = S.settings.flagOff;
+  $('#stFort').value = S.settings.fortR; $('#stMaxAF').value = S.settings.maxAF; $('#stFlag').value = S.settings.flagR; $('#stDiag').checked = S.settings.diag; $('#stStrict').checked = S.settings.strictFlag; $('#stSnapAF').checked = S.settings.snapAF; $('#stStep').value = S.settings.flagStep; $('#stOff').value = S.settings.flagOff;
 }
 function renderCard(){
   const card = $('#card');
@@ -595,8 +673,11 @@ function renderSource(){
   document.body.classList.toggle('has-banner', ro());
   const b = $('#banner');
   if (ro()){
-    b.innerHTML = `<span><b>View only</b>: ${SRC_LABEL[source]}. "Merge" adds its alliances to your layout, "Copy &amp; edit" replaces your layout. / 閲覧のみです。Mergeで自分の配置に結合、Copy &amp; editで丸ごと置き換え。</span>
-      <span class="spacer"></span><button class="btn sm" id="bnMerge" title="Add these alliances into your layout / 自分の配置に結合">Merge</button><button class="btn sm" id="bnCopy">Copy &amp; edit</button><button class="btn sm" id="bnMine">My layout</button>`;
+    const who = source==='published' ? ['the published map','公開版'] : ['a shared map','共有された地図'];
+    b.innerHTML = `<span style="flex-basis:100%">👀 Viewing ${who[0]} (view only). Your map is safe.<br><span class="jp">${who[1]}を見ています（見るだけ）。あなたの地図はそのままです。</span></span>
+      <button class="btn sm primary" id="bnMerge" title="Add these alliances to your map. Same alliance name is replaced. / 同盟を自分の地図に追加（同じ同盟名は入れ替え）">Add to my map / 自分の地図に追加</button>
+      <button class="btn sm" id="bnCopy" title="Throw away your map and use this one / 自分の地図をこれに置き換え">Use this as my map / これを自分の地図に</button>
+      <button class="btn sm" id="bnMine">Back to my map / 自分の地図へ</button>`;
     b.style.display = 'flex';
   } else b.style.display = 'none';
   $('#legend').style.top = (ro() ? b.offsetHeight + 10 : 10) + 'px';
@@ -721,6 +802,7 @@ function placeAt(type, x, y){
     toast(`Max ${S.settings.maxAF} AFs per alliance (AF1 & AF2) / 要塞は1同盟${S.settings.maxAF}つまで`); return;
   }
   const it = snapItem({id:uid(), type, a:curAlliance, x:clamp(x,0,MAP_SIZE-1), y:clamp(y,0,MAP_SIZE-1)});
+  if (type==='flag' && !flagAllowed(curAlliance, it.x, it.y)){ toast(NOT_CONNECTED); return; }
   if (it.x!==x || it.y!==y) toast(`${type==='flag'?'Flags':'AFs'} snap to every ${S.settings.flagStep} tiles → placed at (${it.x}, ${it.y})`);
   S.items.push(it); selectedId = it.id; changed();
   if (type==='flag' && !D.valid.get(it.id)) setTimeout(()=>toast('This Flag is not connected to your territory (inactive) / 領土と繋がっていないため無効です'), 50);
@@ -762,7 +844,7 @@ vp.addEventListener('pointermove', e => {
     if (gest.moved){ view.tx = gest.tx+dx; view.ty = gest.ty+dy; applyView(); }
   } else if (gest.type==='drag'){
     if (!gest.moved && Math.hypot(p.x-gest.sx,p.y-gest.sy) > 4){ gest.moved = true; selectedId = gest.it.id; }
-    if (gest.moved){ const nx = snaps(gest.it) ? snapCoord(t.x,S.settings) : t.x, ny = snaps(gest.it) ? snapCoord(t.y,S.settings) : t.y; if (gest.it.x!==nx || gest.it.y!==ny){ gest.it.x = nx; gest.it.y = ny; renderAll(); } }
+    if (gest.moved && tryMove(gest.it, t.x, t.y)) renderAll();
   } else if (gest.type==='pinch' && pts.size>=2){
     const [a,b] = [...pts.values()];
     const d = Math.hypot(a.x-b.x,a.y-b.y)||1, cx=(a.x+b.x)/2, cy=(a.y+b.y)/2;
@@ -843,6 +925,7 @@ $('#stFort').addEventListener('change', e => { S.settings.fortR = clamp(toInt(e.
 $('#stMaxAF').addEventListener('change', e => { S.settings.maxAF = clamp(toInt(e.target.value,2),1,10); changed(); });
 $('#stFlag').addEventListener('change', e => { S.settings.flagR = clamp(toInt(e.target.value,4),0,100); changed(); });
 $('#stDiag').addEventListener('change', e => { S.settings.diag = e.target.checked; changed(); });
+$('#stStrict').addEventListener('change', e => { S.settings.strictFlag = e.target.checked; changed(); });
 $('#stSnapAF').addEventListener('change', e => { S.settings.snapAF = e.target.checked; resnap(); });
 function resnap(){ S.settings.flagOff %= S.settings.flagStep; S.items.forEach(i => snapItem(i)); changed(); }
 $('#stStep').addEventListener('change', e => { S.settings.flagStep = clamp(toInt(e.target.value,3),1,50); resnap(); });
@@ -853,13 +936,13 @@ $('#card').addEventListener('click', e => {
   if (e.target.id==='cClose'){ selectedId = null; renderAll(); return; }
   if (ro()) return;
   if (e.target.id==='cDel'){ S.items = S.items.filter(i => i!==it); selectedId = null; changed(); }
-  else if (e.target.dataset.nudge){ const k = snaps(it) ? S.settings.flagStep : 1; const [dx,dy] = e.target.dataset.nudge.split(',').map(Number); it.x = clamp(it.x+dx*k,0,MAP_SIZE-1); it.y = clamp(it.y+dy*k,0,MAP_SIZE-1); snapItem(it); changed(); }
+  else if (e.target.dataset.nudge){ const k = snaps(it) ? S.settings.flagStep : 1; const [dx,dy] = e.target.dataset.nudge.split(',').map(Number); if (tryMove(it, it.x+dx*k, it.y+dy*k)) changed(); else if (it.type==='flag') toast(NOT_CONNECTED); }
 });
 $('#card').addEventListener('change', e => {
   const it = S.items.find(i => i.id===selectedId); if (!it || ro()) return;
-  if (e.target.id==='cX') it.x = clamp(toInt(e.target.value,it.x),0,MAP_SIZE-1);
-  if (e.target.id==='cY') it.y = clamp(toInt(e.target.value,it.y),0,MAP_SIZE-1);
-  snapItem(it); changed();
+  const nx = e.target.id==='cX' ? toInt(e.target.value,it.x) : it.x, ny = e.target.id==='cY' ? toInt(e.target.value,it.y) : it.y;
+  if (!tryMove(it, nx, ny) && it.type==='flag') toast(NOT_CONNECTED);
+  changed();
 });
 
 function exportData(){ return {v:1, alliances:S.alliances, items:S.items, settings:S.settings}; }
@@ -867,9 +950,27 @@ async function copyText(text, okMsg){
   try{ await navigator.clipboard.writeText(text); toast(okMsg); }
   catch(e){ prompt('Copy this / コピーしてください', text); }
 }
+const shareLink = async () => location.origin + location.pathname + location.search + '#' + await encodeShare(S);
+function showUrl(url){ const el = $('#shareUrl'); el.value = url; el.hidden = false; }
 $('#btnShare').addEventListener('click', async () => {
-  const url = location.origin + location.pathname + location.search + '#' + await encodeShare(S);
-  copyText(url, 'View-only link copied / 閲覧用URLをコピーしました');
+  const url = await shareLink(); showUrl(url);
+  copyText(url, 'Copied! Paste it in Discord / LINE · コピーしました。DiscordやLINEに貼り付けてください');
+});
+$('#btnNativeShare').addEventListener('click', async () => {
+  const url = await shareLink(); showUrl(url);
+  if (navigator.share){ try{ await navigator.share({title:'Territory map', url}); return; }catch(e){ if (e.name==='AbortError') return; } }
+  copyText(url, 'Copied! Paste it in Discord / LINE · コピーしました。DiscordやLINEに貼り付けてください');
+});
+$('#shareUrl').addEventListener('focus', e => e.target.select());
+function openShareDlg(){ $('#shareUrl').hidden = true; $('#pasteUrl').value = ''; $('#shareDlg').hidden = false; $('#panel').classList.remove('open'); }
+$('#btnOpenShare').addEventListener('click', openShareDlg);
+$('#btnOpenShare2').addEventListener('click', openShareDlg);
+$('#shareDlg').addEventListener('click', e => { if (e.target.id==='shareDlg' || e.target.hasAttribute('data-close')) $('#shareDlg').hidden = true; });
+$('#btnOpenPasted').addEventListener('click', async () => {
+  const v = $('#pasteUrl').value.trim(); const i = v.indexOf('#');
+  if (i < 0){ toast('This is not a map link / 地図のリンクではありません'); return; }
+  try{ sharedData = sanitize(await decodeShare(v.slice(i))); $('#shareDlg').hidden = true; openSource('shared'); }
+  catch(e){ toast('Could not open this link / このリンクは開けませんでした'); }
 });
 $('#btnExport').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(exportData(), null, 1)], {type:'application/json'});
