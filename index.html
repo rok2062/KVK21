@@ -116,7 +116,7 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 22px;text-align:center;co
 </div>
 <div class="wrap">
   <div class="statusbar" id="statusbar"><span class="dotc"></span><span id="statusText">読み込み中</span>
-    <button class="reload" id="btnReload">&#8635; 再読み込み</button></div>
+    <button class="reload" id="btnReload">&#8635; 再読み込み</button> <button class="reload" id="btnLang" title="Switch language">EN</button></div>
 
   <div class="page active" id="page-search">
     <div class="search">
@@ -176,6 +176,181 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 22px;text-align:center;co
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiY3HIyJ4KhBExkTPdJCmsbIq0WXMdQOFTB0Qy8Z0GUKV7b-Jl153NOMOLmGF1iLSZ6OzO_tpbCt4u/pub?gid=809718978&single=true&output=csv";
 const SUBS_CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiY3HIyJ4KhBExkTPdJCmsbIq0WXMdQOFTB0Qy8Z0GUKV7b-Jl153NOMOLmGF1iLSZ6OzO_tpbCt4u/pub?gid=501324789&single=true&output=csv";
 const CAMP_COMBINED_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiY3HIyJ4KhBExkTPdJCmsbIq0WXMdQOFTB0Qy8Z0GUKV7b-Jl153NOMOLmGF1iLSZ6OzO_tpbCt4u/pub?gid=563590891&single=true&output=csv";
+/* ===== 言語切替（JA/EN）: 選択は localStorage に保存 ===== */
+let LANG='ja'; try{LANG=localStorage.getItem('kvk21_lang')||'ja';}catch(e){}
+const DICT=[
+["戦死ノルマ＝用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。戦死0（赤）は未達、撃破0も併記。「ノルマ対象サブ(戦死0検出)」で未達が上に並ぶ。行クリックで個人ページへ。","Death quota applies to subs that answered \"Reinforce\" plus non-responders (Gather / TH / Dormant are exempt). 0 deaths (red) = not met; 0 kills also shown. Use \"Quota subs (0-death check)\" to list misses first. Click a row for details."],
+["戦死ノルマ＝用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。戦死数0は未達（参考で撃破0も併記）。行クリックでサブの個人ページへ。","Death quota applies to \"Reinforce\" + non-responder subs (Gather / TH / Dormant exempt). 0 deaths = not met (0 kills shown for reference). Click a row to open the sub."],
+["サブ登録シートにメインの紐付けが無く、開始戦力が45M未満のアカウントです。撃破・戦死ともノルマ対象外ですが実績値は下に表示します。","No main link in the sub registry and start power under 45M. Exempt from both quotas; actual stats are shown below."],
+["サブ登録シートにメインの紐付けが無く、開始戦力45M未満のアカウント。撃破・戦死ともノルマ対象外（実績値のみ表示）。","No main link in the sub registry, start power under 45M. Exempt from both quotas (actuals only)."],
+["行クリックで詳細。ヘッダークリックで並び替え。撃破ノルマはメインのみ／戦死ノルマはサブのみ対象。","Click a row for details, a header to sort. KP quota: mains only / death quota: subs only."],
+["緑=自国。行クリックで上に日次推移カードを表示。既定は上位","Green = our kingdom. Click a row to show its daily card above. Default: top "],
+["この総督の日次データがありません（生データに未取込の王国・期間）。","No daily data for this governor (kingdom/period not in raw data)."],
+["この総督の日次データがありません（生データに未取込）","No daily data for this governor (not in raw data)"],
+["生データ（メール取込）の王国別合計。取込が無い日は表示されません。","Per-kingdom totals from raw data (mail import). Days without imports are hidden."],
+["生データCSVが読み込めていません（RAW_DAILY_CSV / 公開設定を確認）。","Raw-daily CSV not loaded (check RAW_DAILY_CSV / publish settings)."],
+["「再読み込み」で最新化 ・ データ元: Googleスプレッドシート公開CSV","Press Reload to refresh ・ Source: published Google Sheets CSVs"],
+["行クリックで個人ページへ。100%未満（赤）は撃破ノルマ未達。","Click a row for the member page. Under 100% (red) = KP quota not met."],
+["メイン未割当・開始戦力45M未満のため対象外 ・ 戦死","Unassigned main & start power under 45M — exempt ・ deaths"],
+["各日=棒 / 累計=線 ・ 撃破=左軸 / 戦死=右軸","bars = daily / lines = cumulative ・ KP = left / deaths = right"],
+["陣営データがありません（CSV設定後に表示）","No camp data (shown once CSVs are set)"],
+["このメインに紐づくサブ登録はありません。","No subs registered under this main."],
+["」と回答済みのためノルマ対象外 ・ 戦死","\" — exempt from quota ・ deaths"],
+["貢献度・ノルマ・ランキング・日次推移","Contribution ・ quotas ・ rankings ・ daily trends"],
+["サンプル表示中（CSV URL未設定）","Sample view (CSV URLs not set)"],
+["総督ID / 名前で検索（例: 48275800 / glonige）","Governor ID / name (e.g. 48275800 / glonige)"],
+["(増援サブ対象・戦死0で未達)","(reinforce/no-answer subs; 0 deaths = not met)"],
+["ノルマ対象サブ(戦死0検出)","Quota subs (0-death check)"],
+["未登録サブに撃破ノルマはありません","Unregistered subs have no KP quota"],
+["判定＝戦死数が0かどうか","judged by deaths = 0 or not"],
+["戦死ノルマはサブのみ対象 ・ 戦死","Death quota is subs-only ・ deaths"],
+["サブに撃破ノルマはありません","Subs have no KP quota"],
+["撃破ノルマ平均(メイン)","Avg KP quota (mains)"],
+["名（増援＋未回答が対象）","(reinforce + no-answer)"],
+["戦死P（サブ重み）","Death P (sub-weighted)"],
+["日次 撃破・戦死 推移","Daily KP & death trend"],
+["撃破・戦死 日次推移","Daily KP & deaths"],
+["単位なしの実数 ・","raw numbers ・"],
+["合計（撃破・戦死）","Totals (KP & deaths)"],
+["全体（自国＋他国）","All (ours + rivals)"],
+["増援サブ 戦死あり","Quota subs w/ deaths"],
+["連携中 ・ 自国メイン","Live ・ our mains "],
+["）→サンプル表示",") → sample view"],
+["読み込み失敗（","Load failed ("],
+["メイン未割当 ／ 開始戦力","Main unassigned / start power"],
+["ID / 名前で検索","Search ID / name"],
+["件を表示（重い）"," rows (slow)"],
+["未達ペナルティ対象","Penalty if unmet"],
+["陣営ランキング表","Camp ranking table"],
+["未登録サブはいません","No unregistered subs"],
+["サブのデータがありません","No sub data"],
+["日次データがありません","No daily data"],
+["撃破ノルマ達成率","KP quota rate"],
+["戦死ノルマ達成率","Death quota rate"],
+["撃破ノルマ判定","KP quota check"],
+["未達(戦死0)","Not met (0 deaths)"],
+["戦死0・撃破0","0 deaths・0 kills"],
+["戦死0は","0 deaths:"],
+["名 ・ 陣営"," ・ camps "],
+["王国 ・ "," kingdoms ・ "],
+["王国ランキング","Kingdom ranking"],
+["陣営ランキング","Camp ranking"],
+["ランキング表","Ranking table"],
+["ノルマ対象外","Quota exempt"],
+["メンバー一覧","Member list"],
+["サブ名(最新)","Sub name (latest)"],
+["サブアカウント（","Sub accounts ("],
+["サブアカウント","Sub accounts"],
+["サブ戦死合計","sub deaths total"],
+["用途(アンケ)","Use (survey)"],
+["政庁24以下","TH24 or below"],
+["所属メイン:","Main:"],
+["所属メイン","Main"],
+["メイン / サブ","Mains / Subs"],
+["メインのみ","Mains only"],
+["サブのみ","Subs only"],
+["未登録サブ","Unreg. subs"],
+["貢献度Point","Contribution Pt"],
+["貢献Point","Contribution Pt"],
+["貢献順位","Contrib rank"],
+["撃破ポイント","Kill Points"],
+["撃破数目標値","KP target"],
+["目標死者数","Death target"],
+["戦力（開始時）","Power (start)"],
+["開始戦力","Start power"],
+["一覧の表示:","Show:"],
+["並び替え:","Sort:"],
+["日次推移","Daily trends"],
+["日次テーブル","Daily table"],
+["日次値・","daily ・"],
+["全体累計","Cumulative"],
+["全体合計","Grand total"],
+["全王国 比較 ／","All kingdoms /"],
+["全王国 比較","All kingdoms"],
+["全王国合計","All kingdoms total"],
+["取込日数","Days imported"],
+["最新取込日","Latest import"],
+["生データ最終日","Last raw-data day"],
+["生データ集計","from raw data"],
+["ポータル集計","from portal"],
+["ポータル値","portal value"],
+["読み込み中","Loading"],
+["再読み込み","Reload"],
+["サンプル表示","sample view"],
+["個人検索","Search"],
+["検索一致","matched"],
+["該当なし","No match"],
+["撃破累計","KP cum."],
+["戦死累計","Deaths cum."],
+["撃破順位","KP rank"],
+["戦死順位","Death rank"],
+["撃破/日","KP/day"],
+["戦死/日","Deaths/day"],
+["撃破ノルマ","KP quota"],
+["戦死ノルマ","Death quota"],
+["総戦死数","Total deaths"],
+["戦死数","Deaths"],
+["名達成"," achieved"],
+["対象王国","Kingdoms"],
+["対象外(","Exempt ("],
+["対象外","Exempt"],
+["件に戻す"," rows (collapse)"],
+["件表示。"," rows shown."],
+["登録名)","registered name)"],
+["目標 ","Target "],
+["獲得 ","Got "],
+["判定 ","Check "],
+["対象:","Scope:"],
+["指標:","Metric:"],
+["期間:","Period:"],
+["王国:","Kingdom:"],
+["表示:","View:"],
+["全期間","Full"],
+["自国＋他国","ours + rivals"],
+["閉じる","Close"],
+["クリア","Clear"],
+["未回答","No answer"],
+["増援","Reinforce"],
+["採取","Gather"],
+["休眠","Dormant"],
+["政庁","TH"],
+["メイン","Main"],
+["サブID","Sub ID"],
+["サブ","Sub"],
+["貢献P","Contrib P"],
+["撃破P","KP"],
+["戦死あり","w/ deaths"],
+["戦死0","0 deaths"],
+["戦死","Deaths"],
+["撃破も0","kills also 0"],
+["撃破","KP"],
+["戦力","Power"],
+["名前","Name"],
+["区分","Type"],
+["用途「","Use \""],
+["用途","Use"],
+["順位","Rank"],
+["参加","Joined"],
+["達成","Met"],
+["未達","Not met"],
+["未満）","under)"],
+["未満","under"],
+["目標","Target"],
+["全員","All"],
+["上位","Top "],
+["期間","Period"],
+["日付","Date"],
+["判定","Check"],
+["自国","Ours"],
+["他国","Rival"],
+["王国","Kingdom"],
+["日）"," days)"],
+["累計）","cum.)"],
+["ダッシュボード","Dashboard"],
+["「","\""],["」","\""],["（"," ("],["）",")"],["／","/"],[" 名",""],["順",""]
+].sort((a,b)=>b[0].length-a[0].length);
+function trS(t){ if(LANG!=='en'||t==null) return t; let x=String(t); for(const d of DICT) x=x.split(d[0]).join(d[1]); return x; }
+
 const RAW_DAILY_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiY3HIyJ4KhBExkTPdJCmsbIq0WXMdQOFTB0Qy8Z0GUKV7b-Jl153NOMOLmGF1iLSZ6OzO_tpbCt4u/pub?gid=1437104797&single=true&output=csv";
 
 /* ===== サブ戦死ノルマ（KVK21ルール）=====
@@ -307,8 +482,14 @@ const CAMP_CAP=200; let campShowAll=false, campNeedsRender=true, trendNeedsRende
 let campSel=null, trendScope='compare', trendMetric='kp';
 const KCOLORS=['#5b93ff','#ff5f70','#ffb64a','#a97bff','#2ed3e0','#ff8a4d','#7f9cf5','#e668b3'];
 const $=id=>document.getElementById(id);
-const yen=n=>Math.round(n||0).toLocaleString('ja-JP');
-const oku=n=>{n=n||0;const a=n/1e8;if(Math.abs(a)>=1)return a.toFixed(a>=100?0:2)+'億';const m=n/1e4;if(Math.abs(m)>=1)return m.toFixed(0)+'万';return yen(n);};
+const yen=n=>Math.round(n||0).toLocaleString(LANG==='en'?'en-US':'ja-JP');
+const oku=n=>{n=n||0;
+  if(LANG==='en'){const ab=Math.abs(n);
+    if(ab>=1e9)return (n/1e9).toFixed(Math.abs(n)/1e9>=100?0:2)+'B';
+    if(ab>=1e6)return (n/1e6).toFixed(ab>=1e8?0:1)+'M';
+    if(ab>=1e4)return (n/1e3).toFixed(0)+'K';
+    return yen(n);}
+  const a=n/1e8;if(Math.abs(a)>=1)return a.toFixed(a>=100?0:2)+'億';const m=n/1e4;if(Math.abs(m)>=1)return m.toFixed(0)+'万';return yen(n);};
 const pct=n=>(n==null?'-':n.toFixed(1)+'%');
 function setStatus(kind,text){const b=$('statusbar');b.className='statusbar '+kind;$('statusText').textContent=text;}
 function g(r,k){return r[C[k]];}
@@ -532,15 +713,15 @@ function drawDetailChart(r){
   series.forEach(x=>{ck+=x.kp;cd+=x.dead;cumKP.push(ck);cumDead.push(cd);});
   charts.cDetail=new Chart($('cDetail'),{
     data:{labels,datasets:[
-      {type:'bar',label:'撃破/日',data:dayKP,backgroundColor:'#5b93ff',borderRadius:3,yAxisID:'y',order:3},
-      {type:'line',label:'撃破累計',data:cumKP,borderColor:'#9dbcff',backgroundColor:'#9dbcff',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,order:1},
-      {type:'bar',label:'戦死/日',data:dayDead,backgroundColor:'#ff5f70',borderRadius:3,yAxisID:'y2',order:4},
-      {type:'line',label:'戦死累計',data:cumDead,borderColor:'#ffb64a',backgroundColor:'#ffb64a',yAxisID:'y2',tension:.3,pointRadius:2,borderWidth:2,order:2}]},
+      {type:'bar',label:trS('撃破/日'),data:dayKP,backgroundColor:'#5b93ff',borderRadius:3,yAxisID:'y',order:3},
+      {type:'line',label:trS('撃破累計'),data:cumKP,borderColor:'#9dbcff',backgroundColor:'#9dbcff',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,order:1},
+      {type:'bar',label:trS('戦死/日'),data:dayDead,backgroundColor:'#ff5f70',borderRadius:3,yAxisID:'y2',order:4},
+      {type:'line',label:trS('戦死累計'),data:cumDead,borderColor:'#ffb64a',backgroundColor:'#ffb64a',yAxisID:'y2',tension:.3,pointRadius:2,borderWidth:2,order:2}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{color:'#96a2ba'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+yen(c.raw)}}},
       scales:{x:{ticks:{color:'#96a2ba'},grid:{color:'#263149'}},
-        y:{position:'left',title:{display:true,text:'撃破',color:'#5b93ff'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'}},
-        y2:{position:'right',title:{display:true,text:'戦死',color:'#ff5f70'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{drawOnChartArea:false}}}}});
+        y:{position:'left',title:{display:true,text:trS('撃破'),color:'#5b93ff'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'}},
+        y2:{position:'right',title:{display:true,text:trS('戦死'),color:'#ff5f70'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{drawOnChartArea:false}}}}});
 }
 function onSearch(){renderDir();renderDetail();}
 
@@ -706,15 +887,15 @@ function renderCampDetail(){
     series.forEach(x=>{ck+=x.kp;cd+=x.dead;cumKP.push(ck);cumDead.push(cd);});
     charts.cCampDetail=new Chart($('cCampDetail'),{
       data:{labels,datasets:[
-        {type:'bar',label:'撃破/日',data:dayKP,backgroundColor:'#5b93ff',borderRadius:3,yAxisID:'y',order:3},
-        {type:'line',label:'撃破累計',data:cumKP,borderColor:'#9dbcff',backgroundColor:'#9dbcff',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,order:1},
-        {type:'bar',label:'戦死/日',data:dayDead,backgroundColor:'#ff5f70',borderRadius:3,yAxisID:'y2',order:4},
-        {type:'line',label:'戦死累計',data:cumDead,borderColor:'#ffb64a',backgroundColor:'#ffb64a',yAxisID:'y2',tension:.3,pointRadius:2,borderWidth:2,order:2}]},
+        {type:'bar',label:trS('撃破/日'),data:dayKP,backgroundColor:'#5b93ff',borderRadius:3,yAxisID:'y',order:3},
+        {type:'line',label:trS('撃破累計'),data:cumKP,borderColor:'#9dbcff',backgroundColor:'#9dbcff',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,order:1},
+        {type:'bar',label:trS('戦死/日'),data:dayDead,backgroundColor:'#ff5f70',borderRadius:3,yAxisID:'y2',order:4},
+        {type:'line',label:trS('戦死累計'),data:cumDead,borderColor:'#ffb64a',backgroundColor:'#ffb64a',yAxisID:'y2',tension:.3,pointRadius:2,borderWidth:2,order:2}]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{labels:{color:'#96a2ba'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+yen(c.raw)}}},
         scales:{x:{ticks:{color:'#96a2ba'},grid:{color:'#263149'}},
-          y:{position:'left',title:{display:true,text:'撃破',color:'#5b93ff'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'}},
-          y2:{position:'right',title:{display:true,text:'戦死',color:'#ff5f70'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{drawOnChartArea:false}}}}});
+          y:{position:'left',title:{display:true,text:trS('撃破'),color:'#5b93ff'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'}},
+          y2:{position:'right',title:{display:true,text:trS('戦死'),color:'#ff5f70'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{drawOnChartArea:false}}}}});
   }
   el.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -783,15 +964,15 @@ function renderTrend(){
     let ck=0,cd=0; const cumKP=dayKP.map(v=>ck+=v), cumDead=dayDead.map(v=>cd+=v);
     charts.cTrend=new Chart($('cTrend'),{
       data:{labels,datasets:[
-        {type:'bar',label:'撃破/日',data:dayKP,backgroundColor:'#5b93ff',borderRadius:3,yAxisID:'y',order:3},
-        {type:'line',label:'撃破累計',data:cumKP,borderColor:'#9dbcff',backgroundColor:'#9dbcff',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,order:1},
-        {type:'bar',label:'戦死/日',data:dayDead,backgroundColor:'#ff5f70',borderRadius:3,yAxisID:'y2',order:4},
-        {type:'line',label:'戦死累計',data:cumDead,borderColor:'#ffb64a',backgroundColor:'#ffb64a',yAxisID:'y2',tension:.3,pointRadius:2,borderWidth:2,order:2}]},
+        {type:'bar',label:trS('撃破/日'),data:dayKP,backgroundColor:'#5b93ff',borderRadius:3,yAxisID:'y',order:3},
+        {type:'line',label:trS('撃破累計'),data:cumKP,borderColor:'#9dbcff',backgroundColor:'#9dbcff',yAxisID:'y',tension:.3,pointRadius:2,borderWidth:2,order:1},
+        {type:'bar',label:trS('戦死/日'),data:dayDead,backgroundColor:'#ff5f70',borderRadius:3,yAxisID:'y2',order:4},
+        {type:'line',label:trS('戦死累計'),data:cumDead,borderColor:'#ffb64a',backgroundColor:'#ffb64a',yAxisID:'y2',tension:.3,pointRadius:2,borderWidth:2,order:2}]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{labels:{color:'#96a2ba'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+yen(c.raw)}}},
         scales:{x:{ticks:{color:'#96a2ba'},grid:{color:'#263149'}},
-          y:{position:'left',title:{display:true,text:'撃破',color:'#5b93ff'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'}},
-          y2:{position:'right',title:{display:true,text:'戦死',color:'#ff5f70'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{drawOnChartArea:false}}}}});
+          y:{position:'left',title:{display:true,text:trS('撃破'),color:'#5b93ff'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'}},
+          y2:{position:'right',title:{display:true,text:trS('戦死'),color:'#ff5f70'},ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{drawOnChartArea:false}}}}});
     th.innerHTML='<tr><th>日付</th><th>撃破/日</th><th>撃破累計</th><th>戦死/日</th><th>戦死累計</th></tr>';
     tb.innerHTML=KDATES.map((d,i)=>`<tr><td>${d}</td><td>${oku(dayKP[i])}</td><td>${oku(cumKP[i])}</td><td>${oku(dayDead[i])}</td><td>${oku(cumDead[i])}</td></tr>`).join('');
     $('trendCount').textContent='（'+k+' ・ '+KDATES.length+'日）';
@@ -816,6 +997,36 @@ function switchTab(t){
     else { if(charts.cTrend)charts.cTrend.resize(); }
   } else if(t==='rank'){ if(charts.cRank)charts.cRank.resize(); }
 }
+/* ===== 言語適用（DOM置換・localStorage保存） ===== */
+const DOC_TITLE=document.title;
+let _trBusy=false,_trT=null;
+function translateDom(root){
+  _trBusy=true;
+  try{
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null);
+    const list=[]; let nd;
+    while(nd=w.nextNode()) list.push(nd);
+    for(const n of list){
+      const p=n.parentNode; if(!p||p.nodeName==='SCRIPT'||p.nodeName==='STYLE') continue;
+      if(LANG==='en'){ if(n._ja==null) n._ja=n.nodeValue; const t=trS(n._ja); if(t!==n.nodeValue) n.nodeValue=t; }
+      else if(n._ja!=null && n.nodeValue!==n._ja){ n.nodeValue=n._ja; }
+    }
+    const q=$('q'); if(q){ if(q._ja==null) q._ja=q.placeholder; q.placeholder=LANG==='en'?trS(q._ja):q._ja; }
+    document.title=LANG==='en'?trS(DOC_TITLE):DOC_TITLE;
+    const bl=$('btnLang'); if(bl) bl.textContent=LANG==='en'?'日本語':'EN';
+  } finally { _trBusy=false; }
+}
+new MutationObserver(()=>{ if(_trBusy||LANG!=='en') return; clearTimeout(_trT); _trT=setTimeout(()=>translateDom(document.body),40); })
+  .observe(document.body,{childList:true,subtree:true,characterData:true});
+function setLang(l){
+  LANG=l; try{localStorage.setItem('kvk21_lang',l);}catch(e){}
+  campNeedsRender=true; trendNeedsRender=true;
+  if(DATA){ renderDirFilter();renderDir();renderRankTab();renderCampTab();renderTrendTab();renderDetail(); }
+  translateDom(document.body);
+}
+$('btnLang').onclick=()=>setLang(LANG==='en'?'ja':'en');
+if(LANG==='en') translateDom(document.body);
+
 document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchTab(t.dataset.tab));
 $('q').addEventListener('input',onSearch);
 $('qClr').onclick=()=>{$('q').value='';onSearch();};
