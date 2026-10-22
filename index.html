@@ -505,7 +505,10 @@ function judgeCell(r){ const j=deathJudge(r);
   if(j==='ok') return '<span class="ok">達成</span>';
   const kp0=(g(r,'totalKP')||0)===0;
   return '<span class="ng">戦死0'+(kp0?'・撃破0':'')+'</span>'; }
-function kcolor(k,i){return /自国/.test(k)?'#3ecf8e':KCOLORS[i%KCOLORS.length];}
+/* 自国判定: 表示名に「自国」を含む、または王国ID 2062 を含む */
+const SELF_KID='2062', SELFRE=new RegExp('(^|\\D)'+SELF_KID+'(\\D|$)');
+const isSelfK=k=>{k=String(k==null?'':k);return k.indexOf('自国')>=0||SELFRE.test(k);};
+function kcolor(k,i){return isSelfK(k)?'#3ecf8e':KCOLORS[i%KCOLORS.length];}
 function rkCls(i){return i===0?'rk r1':i===1?'rk r2':i===2?'rk r3':'rk';}
 
 function buildSubsMap(subsD){
@@ -524,7 +527,7 @@ function buildKingdomDaily(){
     d.kp+=x.kp; d.dead+=x.dead;
   });
   KDATES=[...ds].sort();
-  KLIST=Object.keys(KD).sort((a,b)=>(/自国/.test(b)?1:0)-(/自国/.test(a)?1:0) || a.localeCompare(b,'ja'));
+  KLIST=Object.keys(KD).sort((a,b)=>(isSelfK(b)?1:0)-(isSelfK(a)?1:0) || a.localeCompare(b,'ja'));
 }
 function applyData(d, subsD, campRows, dailyRows){
   DATA=d; C={}; DATA.cols.forEach((c,i)=>C[c]=i); ROWS=DATA.rows;
@@ -838,14 +841,14 @@ function renderCamp(){
   const top=sorted.slice(0,20);
   if(charts.cCamp)charts.cCamp.destroy();
   charts.cCamp=new Chart($('cCamp'),{type:'bar',
-    data:{labels:top.map(r=>r.name),datasets:[{data:top.map(r=>r[m.key]||0),backgroundColor:top.map(r=>/自国/.test(r.kingdom)?'#3ecf8e':m.color),borderRadius:4}]},
+    data:{labels:top.map(r=>r.name),datasets:[{data:top.map(r=>r[m.key]||0),backgroundColor:top.map(r=>isSelfK(r.kingdom)?'#3ecf8e':m.color),borderRadius:4}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>oku(c.raw)+'（'+top[c.dataIndex].kingdom+'）'}}},
       scales:{x:{ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'}},y:{ticks:{color:'#96a2ba',font:{size:11}},grid:{display:false}}}}});
   const th=$('campTbl').querySelector('thead'), tb=$('campTbl').querySelector('tbody');
   th.innerHTML='<tr><th>順位</th><th>名前</th><th>王国</th><th>撃破P</th><th>戦死</th></tr>';
   const capped = !campShowAll && sorted.length>CAMP_CAP;
   const view = capped ? sorted.slice(0,CAMP_CAP) : sorted;
-  tb.innerHTML=view.map((r,i)=>{const self=/自国/.test(r.kingdom);
+  tb.innerHTML=view.map((r,i)=>{const self=isSelfK(r.kingdom);
     const kpC=campMetric==='kp'?`<b>${oku(r.kp)}</b>`:oku(r.kp);
     const dC=campMetric==='dead'?`<b>${oku(r.dead)}</b>`:oku(r.dead);
     return `<tr data-id="${r.id}" data-k="${r.kingdom}"><td><span class="${rkCls(i)}">${i+1}</span></td><td>${r.name}</td><td class="${self?'ok':'muted'}">${r.kingdom}</td><td>${kpC}</td><td>${dC}</td></tr>`;}).join('') || '<tr><td colspan="5" class="empty">陣営データがありません（CSV設定後に表示）</td></tr>';
@@ -865,7 +868,7 @@ function renderCampDetail(){
   const rows=CAMPROWS.filter(r=>String(r.id)===String(campSel.id)&&r.kingdom===campSel.kingdom);
   if(!rows.length){ el.innerHTML=''; campSel=null; return; }
   const r0=rows[0];
-  const self=/自国/.test(r0.kingdom);
+  const self=isSelfK(r0.kingdom);
   const series=DAILYMAP[String(r0.id)]||[];
   el.innerHTML=`<div class="card" style="border-color:#3b4a74"><div class="detail-head">
       <span class="nm">${r0.name}</span>
@@ -954,7 +957,7 @@ function renderTrend(){
         plugins:{legend:{labels:{color:'#96a2ba'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+yen(c.raw)}}},
         scales:{x:{ticks:{color:'#96a2ba'},grid:{color:'#263149'}},
           y:{ticks:{color:'#96a2ba',callback:v=>oku(v)},grid:{color:'#263149'},title:{display:true,text:m.label+'（累計）',color:'#96a2ba'}}}}});
-    th.innerHTML='<tr><th>日付</th>'+KLIST.map(k=>`<th class="${/自国/.test(k)?'ok':''}">${k}</th>`).join('')+'</tr>';
+    th.innerHTML='<tr><th>日付</th>'+KLIST.map(k=>`<th class="${isSelfK(k)?'ok':''}">${k}</th>`).join('')+'</tr>';
     tb.innerHTML=KDATES.map(d=>'<tr><td>'+d+'</td>'+KLIST.map(k=>{const v=(KD[k][d]||{})[m.key];return '<td>'+(v==null?'<span class="muted">―</span>':oku(v))+'</td>';}).join('')+'</tr>').join('');
     $('trendCount').textContent='（'+m.label+'／日次値・'+KDATES.length+'日）';
   } else {
