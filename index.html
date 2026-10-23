@@ -179,8 +179,8 @@ const CAMP_COMBINED_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiY3
 /* ===== 言語切替（JA/EN）: 選択は localStorage に保存 ===== */
 let LANG='ja'; try{LANG=localStorage.getItem('kvk21_lang')||'ja';}catch(e){}
 const DICT=[
-["戦死ノルマ＝用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。戦死0（赤）は未達、撃破0も併記。「ノルマ対象サブ(戦死0検出)」で未達が上に並ぶ。行クリックで個人ページへ。","Death quota applies to subs that answered \"Reinforce\" plus non-responders (Gather / TH / Dormant are exempt). 0 deaths (red) = not met; 0 kills also shown. Use \"Quota subs (0-death check)\" to list misses first. Click a row for details."],
-["戦死ノルマ＝用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。戦死数0は未達（参考で撃破0も併記）。行クリックでサブの個人ページへ。","Death quota applies to \"Reinforce\" + non-responder subs (Gather / TH / Dormant exempt). 0 deaths = not met (0 kills shown for reference). Click a row to open the sub."],
+["戦死ノルマ＝T5+T4戦死÷（開始戦力×0.5%）。「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。100%未満（赤）は未達。「戦死ノルマ(未達が上)」で未達から並ぶ。行クリックで個人ページへ。","Death quota = T5+T4 deaths \u00f7 (start power \u00d7 0.5%). \"Reinforce\" + no-answer subs only (Gather/TH/Dormant exempt). Under 100% (red) = not met. Use \"Death quota (misses first)\" to sort misses on top. Click a row for details."],
+["戦死ノルマ＝T5+T4戦死÷（開始戦力×0.5%）。用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。100%以上=達成。行クリックでサブの個人ページへ。","Death quota = T5+T4 deaths \u00f7 (start power \u00d7 0.5%). Applies to \"Reinforce\" + no-answer subs (Gather/TH/Dormant exempt). 100%+ = met. Click a row to open the sub."],
 ["サブ登録シートにメインの紐付けが無く、開始戦力が45M未満のアカウントです。撃破・戦死ともノルマ対象外ですが実績値は下に表示します。","No main link in the sub registry and start power under 45M. Exempt from both quotas; actual stats are shown below."],
 ["サブ登録シートにメインの紐付けが無く、開始戦力45M未満のアカウント。撃破・戦死ともノルマ対象外（実績値のみ表示）。","No main link in the sub registry, start power under 45M. Exempt from both quotas (actuals only)."],
 ["行クリックで詳細。ヘッダークリックで並び替え。撃破ノルマはメインのみ／戦死ノルマはサブのみ対象。","Click a row for details, a header to sort. KP quota: mains only / death quota: subs only."],
@@ -213,7 +213,17 @@ const DICT=[
 ["単位なしの実数 ・","raw numbers ・"],
 ["合計（撃破・戦死）","Totals (KP & deaths)"],
 ["全体（自国＋他国）","All (ours + rivals)"],
-["増援サブ 戦死あり","Quota subs w/ deaths"],
+["サブ戦死ノルマ達成","Sub death quota met"],
+["戦死ノルマ(未達が上)","Death quota (misses first)"],
+["戦死(T5+T4)","Deaths (T5+T4)"],
+["目標戦死","Death target"],
+["戦死・撃破とも0","0 deaths & 0 kills"],
+["・戦死撃破0","・0 deaths&kills"],
+["・戦死0","・0 deaths"],
+["目標=開始戦力×0.5%（T5+T4）・増援＋未回答が対象","target = start power \u00d70.5% (T5+T4) ・ reinforce + no-answer"],
+["(増援・未回答サブ対象 ・ T5+T4戦死÷開始戦力の0.5%)","(reinforce/no-answer subs ・ T5+T4 deaths \u00f7 0.5% of start power)"],
+["（開始戦力×0.5%）","(start power \u00d7 0.5%)"],
+["全戦死","total deaths"],
 ["連携中 ・ 自国メイン","Live ・ our mains "],
 ["）→サンプル表示",") → sample view"],
 ["読み込み失敗（","Load failed ("],
@@ -249,6 +259,10 @@ const DICT=[
 ["メイン / サブ","Mains / Subs"],
 ["メインのみ","Mains only"],
 ["サブのみ","Subs only"],
+["増援サブ（未回答含む）","Quota subs (incl. no-answer)"],
+["増援サブ","Quota subs"],
+["その他サブ","Other subs"],
+["全体","All"],
 ["未登録サブ","Unreg. subs"],
 ["貢献度Point","Contribution Pt"],
 ["貢献Point","Contribution Pt"],
@@ -356,7 +370,7 @@ const RAW_DAILY_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiY3HIyJ
 /* ===== サブ戦死ノルマ（KVK21ルール）=====
    サブ用途アンケで「増援(Reinforcement)」と回答したサブ、およびアンケ未回答のサブに戦死ノルマが発生。
    （採取・政庁24以下・休眠と回答済みのサブのみ対象外）
-   戦力による対象判定（45M等）は廃止。判定＝戦死数が0かどうか（参考として撃破0も併記）。
+   目標＝開始戦力×0.5%（兵数）。カウントする戦死は T5＋T4 のみ（ノルマ詳細シート準拠）。
    SUB_USE_CSV に「サブ用途アンケ」シートの公開CSV URLを貼ると最新アンケで判定する。
    未設定の間は SUBUSE_SNAPSHOT（2026/10/15時点・437件）を使用 */
 const SUB_USE_CSV = "";
@@ -370,6 +384,8 @@ function useOf(id){return SUBUSE[String(id)]||null;}
 function useLabelOf(id){const u=useOf(id);return u?USE_LABEL[u]:'未回答';}
 /* ノルマ対象＝増援(R) または アンケ未回答。採取/政庁/休眠は対象外 */
 function isReinfRow(r){const u=useOf(g(r,'id'));return u==='R'||u==null;}
+/* 戦死ノルマ（ノルマ詳細シート）: 目標＝開始戦力×0.5%（兵数・T5/T4戦死のみカウント） */
+const DEATH_RATE=0.005;
 
 /* ===== 最小サンプル（URL未設定・読み込み失敗時のみ）===== */
 const FALLBACK={"rows":[
@@ -476,7 +492,7 @@ let DATA=null, C={}, ROWS=[], MAIN=[], SUBONLY=[], UNREG=[], SUBIDS=new Set(), U
 let SUBSMAP={}, SUB2MAIN={}, PMAP={}, dirSort={k:'contribPoint',d:-1}, dirFilter='all';
 let DAILY=[], DAILYMAP={}, HASDAILY=false;
 let KD={}, KDATES=[], KLIST=[];
-let rankScope='main', mainMetric='contrib', subMetric='dead', unregMetric='dead';
+let rankScope='main', mainMetric='contrib', subMetric='dead', sub2Metric='dead', unregMetric='dead';
 let CAMPROWS=[], campScope='all', campMetric='kp', campPeriod='';
 const CAMP_CAP=200; let campShowAll=false, campNeedsRender=true, trendNeedsRender=true;
 let campSel=null, trendScope='compare', trendMetric='kp';
@@ -498,13 +514,15 @@ function isUnregRow(r){return UNREGIDS.has(String(g(r,'id')));}
 function kindOf(r){return isSubRow(r)?'sub':isUnregRow(r)?'unreg':'main';}
 function kindPill(r){const k=kindOf(r);
   return k==='sub'?'<span class="pill sub">サブ</span>':k==='unreg'?'<span class="pill unreg">未登録サブ</span>':'<span class="pill main">メイン</span>';}
-/* 増援・未回答サブの判定: 'ok'(戦死あり) / 'zero'(戦死0) / null(対象外) */
-function deathJudge(r){ if(!isReinfRow(r)) return null; return (g(r,'totalDead')||0)>0?'ok':'zero'; }
-function judgeCell(r){ const j=deathJudge(r);
-  if(j==null) return `<span class="muted">対象外(${useLabelOf(g(r,'id'))})</span>`;
-  if(j==='ok') return '<span class="ok">達成</span>';
-  const kp0=(g(r,'totalKP')||0)===0;
-  return '<span class="ng">戦死0'+(kp0?'・撃破0':'')+'</span>'; }
+/* 増援・未回答サブの戦死ノルマ: T5+T4戦死 ÷（開始戦力×0.5%）。対象外は null */
+function deathCount(r){return (g(r,'totalDeadT5')||0)+(g(r,'totalDeadT4')||0);}
+function deathTargetOf(p){return Math.round((p||0)*DEATH_RATE);}
+function deathPct(r){ if(!isReinfRow(r)) return null;
+  const t=deathTargetOf(g(r,'startPower')); return t>0? deathCount(r)/t*100 : null; }
+function judgeCell(r){ const p=deathPct(r);
+  if(p==null) return `<span class="muted">対象外(${useLabelOf(g(r,'id'))})</span>`;
+  const z=deathCount(r)===0, kp0=(g(r,'totalKP')||0)===0;
+  return `<span class="${p>=100?'ok':'ng'}">${pct(p)}${z?(kp0?'・戦死撃破0':'・戦死0'):''}</span>`; }
 /* 自国判定: 表示名に「自国」を含む、または王国ID 2062 を含む */
 const SELF_KID='2062', SELFRE=new RegExp('(^|\\D)'+SELF_KID+'(\\D|$)');
 const isSelfK=k=>{k=String(k==null?'':k);return k.indexOf('自国')>=0||SELFRE.test(k);};
@@ -592,7 +610,7 @@ function dirVal(r,k){
   const kd=kindOf(r);
   if(k==='kind') return kd==='main'?0:kd==='sub'?1:2;
   if(k==='use') return kd==='sub'? useLabelOf(g(r,'id')) : '';
-  if(k==='dnorm'){ if(kd!=='sub') return null; const j=deathJudge(r); return j==null?null:(j==='ok'?2:1); }
+  if(k==='dnorm'){ return kd==='sub'? deathPct(r) : null; }
   if(k==='kpNorm') return kd==='main'? g(r,'kpNorm') : null;
   return g(r,k);
 }
@@ -653,12 +671,14 @@ function renderDetail(){
       const latest = pr? g(pr,'name') : s.subName;
       const dead = pr? g(pr,'totalDead') : null;
       const pw   = pr? g(pr,'startPower') : null;
-      if(pr){joined++; totDead+=(dead||0);}
+      if(pr){joined++; totDead+=(dd||0);}
+      const dd = pr? deathCount(pr) : null;
+      const tgt = (pr&&deathPct(pr)!=null)? deathTargetOf(pw) : null;
       const useCell = `<span class="muted">${useLabelOf(s.subId)}</span>`;
       const nrmCell = pr? judgeCell(pr) : '-';
-      return `<tr data-id="${s.subId}"><td>${latest}${pr?'':' <span class="muted" style="font-size:10px">(登録名)</span>'}</td><td class="muted">${s.subId}</td><td>${pr?'<span class="ok">参加</span>':'<span class="muted">―</span>'}</td><td>${pw!=null?oku(pw):'-'}</td><td>${dead!=null?oku(dead):'-'}</td><td>${useCell}</td><td>${nrmCell}</td></tr>`;
+      return `<tr data-id="${s.subId}"><td>${latest}${pr?'':' <span class="muted" style="font-size:10px">(登録名)</span>'}</td><td class="muted">${s.subId}</td><td>${pr?'<span class="ok">参加</span>':'<span class="muted">―</span>'}</td><td>${pw!=null?oku(pw):'-'}</td><td>${dd!=null?oku(dd):'-'}</td><td>${tgt!=null?oku(tgt):'<span class="muted">-</span>'}</td><td>${useCell}</td><td>${nrmCell}</td></tr>`;
     }).join('');
-    subsHtml=`<h3 style="margin-top:18px">\u{1F465} サブアカウント（${subs.length}） <span class="muted" style="font-weight:400;font-size:12px">参加 ${joined} ／ サブ戦死合計 ${oku(totDead)}</span></h3><div class="tbl-wrap" style="max-height:300px"><table id="subTbl"><thead><tr><th>サブ名(最新)</th><th>サブID</th><th>参加</th><th>戦力</th><th>戦死</th><th>用途</th><th>戦死ノルマ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div class="hint">戦死ノルマ＝用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。戦死数0は未達（参考で撃破0も併記）。行クリックでサブの個人ページへ。</div>`;
+    subsHtml=`<h3 style="margin-top:18px">\u{1F465} サブアカウント（${subs.length}） <span class="muted" style="font-weight:400;font-size:12px">参加 ${joined} ／ サブ戦死(T5+T4)合計 ${oku(totDead)}</span></h3><div class="tbl-wrap" style="max-height:300px"><table id="subTbl"><thead><tr><th>サブ名(最新)</th><th>サブID</th><th>参加</th><th>戦力</th><th>戦死(T5+T4)</th><th>目標戦死</th><th>用途</th><th>戦死ノルマ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div><div class="hint">戦死ノルマ＝T5+T4戦死÷（開始戦力×0.5%）。用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。100%以上=達成。行クリックでサブの個人ページへ。</div>`;
   } else {
     subsHtml=`<h3 style="margin-top:18px">\u{1F465} サブアカウント</h3><div class="hint">このメインに紐づくサブ登録はありません。</div>`;
   }
@@ -681,9 +701,10 @@ function renderSubDetail(r){
   const dispDead=useRaw? dseries.reduce((a,x)=>a+(x.dead||0),0):g(r,'totalDead');
   const dispKP=useRaw? dseries.reduce((a,x)=>a+(x.kp||0),0):g(r,'totalKP');
   const pw=g(r,'startPower');
-  const j=unreg?null:deathJudge(r);
+  const dN=unreg?null:deathPct(r);
+  const dCnt=deathCount(r), dTgt=deathTargetOf(pw);
   const useLbl=useLabelOf(g(r,'id'));
-  const dColor=j==='ok'?'var(--green)':'var(--red)';
+  const dColor=dN>=100?'var(--green)':'var(--red)';
   const mid=SUB2MAIN[String(g(r,'id'))], mr=mid?PMAP[mid]:null;
   const mName=mr?g(mr,'name'):(mid||'-');
   const headExtra = unreg
@@ -691,15 +712,15 @@ function renderSubDetail(r){
     : `<span class="pill sub">SUB</span><span class="id">所属メイン: <a href="#" id="goMain" style="color:var(--blue);font-weight:700">${mName}</a> ／ 開始戦力 ${oku(pw)}</span>`;
   const deathMeta = unreg
     ? `メイン未割当・開始戦力45M未満のため対象外 ・ 戦死 ${yen(dispDead)}（T5 ${yen(g(r,'totalDeadT5'))} / T4 ${yen(g(r,'totalDeadT4'))}）`
-    : (j!=null?`戦死 ${yen(dispDead)}（T5 ${yen(g(r,'totalDeadT5'))} / T4 ${yen(g(r,'totalDeadT4'))}）・ 判定＝戦死数が0かどうか${dispKP===0?' ・ ⚠️ 撃破も0':''}`
+    : (dN!=null?`戦死(T5+T4) ${yen(dCnt)} / 目標 ${yen(dTgt)}（開始戦力×0.5%）・ 全戦死 ${yen(dispDead)}${dCnt===0&&dispKP===0?' ・ ⚠️ 戦死・撃破とも0':''}`
               :`用途「${useLbl}」と回答済みのためノルマ対象外 ・ 戦死 ${yen(dispDead)}`);
   det.innerHTML=`<div class="card"><div class="detail-head"><span class="nm">${g(r,'name')}</span><span class="id">ID: ${g(r,'id')}</span>${headExtra}</div>
     ${unreg?'<div class="hint" style="margin:0 0 10px">※ サブ登録シートにメインの紐付けが無く、開始戦力が45M未満のアカウントです。撃破・戦死ともノルマ対象外ですが実績値は下に表示します。</div>':''}
     <div class="norm"><div class="normbox"><div class="t">⚔️ 撃破ノルマ達成率</div><div class="big" style="color:var(--muted)">対象外</div><div class="meta">${unreg?'未登録サブに撃破ノルマはありません':'サブに撃破ノルマはありません'} ・ 撃破P ${yen(dispKP)}</div></div>
-    <div class="normbox"><div class="t">\u{1F480} 戦死ノルマ <span class="muted" style="font-weight:400">(増援サブ対象・戦死0で未達)</span></div><div class="big" style="color:${j!=null?dColor:'var(--muted)'}">${j!=null?(j==='ok'?'達成':'未達(戦死0)'):'対象外'}</div><div class="meta">${deathMeta}</div></div></div>
+    <div class="normbox"><div class="t">\u{1F480} 戦死ノルマ達成率 <span class="muted" style="font-weight:400">(増援・未回答サブ対象 ・ T5+T4戦死÷開始戦力の0.5%)</span></div><div class="big" style="color:${dN!=null?dColor:'var(--muted)'}">${dN!=null?pct(dN):'対象外'}</div>${dN!=null?bars(dN,Math.max(150,dN),dColor):''}<div class="meta">${deathMeta}</div></div></div>
     <div class="statgrid"><div class="sb"><div class="l">貢献Point</div><div class="v">${oku(g(r,'contribPoint'))}</div><div class="r">${unreg?'ポータル値':'戦死P（サブ重み）'}</div></div>
     <div class="sb"><div class="l">撃破P</div><div class="v">${oku(dispKP)}</div><div class="r">ノルマ対象外</div></div>
-    <div class="sb"><div class="l">戦死数</div><div class="v">${oku(dispDead)}</div><div class="r">${j!=null?'判定 '+(j==='ok'?'達成':'未達(戦死0)'):'ノルマ対象外'}</div></div>
+    <div class="sb"><div class="l">戦死(T5+T4)</div><div class="v">${oku(dCnt)}</div><div class="r">${dN!=null?'目標 '+oku(dTgt)+' ・ 判定 '+(dN>=100?'達成':'未達'):'ノルマ対象外'}</div></div>
     <div class="sb"><div class="l">${unreg?'開始戦力':'用途(アンケ)'}</div><div class="v">${unreg?oku(pw):useLbl}</div><div class="r">${unreg?'45M未満':'開始戦力 '+oku(pw)}</div></div></div>
     <h3 style="margin-top:18px">\u{1F4C8} 日次 撃破・戦死 推移 <span class="muted" style="font-weight:400;font-size:11px">各日=棒 / 累計=線 ・ 撃破=左軸 / 戦死=右軸</span></h3><div class="chart-box" style="height:300px"><canvas id="cDetail"></canvas></div><div class="hint" id="detailChartHint"></div></div>`;
   const gm=$('goMain'); if(gm&&mid) gm.onclick=e=>{e.preventDefault();$('q').value=mid;onSearch();};
@@ -737,7 +758,7 @@ const METRICS={
 };
 const SUBMETRICS={
   dead:{label:'戦死数',key:'totalDead',color:'#ff5f70',fmt:oku,isNorm:false},
-  reinf0:{label:'ノルマ対象サブ(戦死0検出)',key:'totalDead',color:'#ffb64a',fmt:oku,isNorm:false,filter:isReinfRow,asc:true},
+  reinf0:{label:'戦死ノルマ(未達が上)',calc:deathPct,color:'#ffb64a',fmt:pct,isNorm:true,filter:isReinfRow,asc:true},
   kp:{label:'撃破ポイント',key:'totalKP',color:'#5b93ff',fmt:oku,isNorm:false}
 };
 const UNREGMETRICS={
@@ -745,39 +766,40 @@ const UNREGMETRICS={
   kp:{label:'撃破ポイント',key:'totalKP',color:'#5b93ff',fmt:oku,isNorm:false},
   power:{label:'開始戦力',key:'startPower',color:'#96a2ba',fmt:oku,isNorm:false}
 };
-function curSet(){return rankScope==='sub'?SUBMETRICS:rankScope==='unreg'?UNREGMETRICS:METRICS;}
-function curKey(){return rankScope==='sub'?subMetric:rankScope==='unreg'?unregMetric:mainMetric;}
-function curList(){return rankScope==='sub'?SUBONLY:rankScope==='unreg'?UNREG:MAIN;}
+const reinfSubs=()=>SUBONLY.filter(isReinfRow), otherSubs=()=>SUBONLY.filter(r=>!isReinfRow(r));
+function curSet(){return rankScope==='sub'?SUBMETRICS:rankScope==='sub2'?UNREGMETRICS:rankScope==='unreg'?UNREGMETRICS:METRICS;}
+function curKey(){return rankScope==='sub'?subMetric:rankScope==='sub2'?sub2Metric:rankScope==='unreg'?unregMetric:mainMetric;}
+function curList(){return rankScope==='sub'?reinfSubs():rankScope==='sub2'?otherSubs():rankScope==='unreg'?UNREG:MAIN;}
 function renderKPIs(){
   const n=MAIN.length;
   const avgNorm=n?MAIN.reduce((a,r)=>a+(g(r,'kpNorm')||0),0)/n:0;
   const achieved=MAIN.filter(r=>g(r,'kpNorm')>=100).length;
   const sTgt=SUBONLY.filter(isReinfRow);
-  const sAch=sTgt.filter(r=>(g(r,'totalDead')||0)>0).length;
+  const sAch=sTgt.filter(r=>(deathPct(r)||0)>=100).length;
   const items=[
     ['メイン / サブ', MAIN.length+' / '+SUBONLY.length,'未登録サブ '+UNREG.length+' 名'],
     ['撃破ノルマ平均(メイン)', avgNorm.toFixed(1)+'%', achieved+' 名達成'],
-    ['増援サブ 戦死あり', sAch+' / '+sTgt.length+' 名','戦死0は '+(sTgt.length-sAch)+' 名（増援＋未回答が対象）'],
+    ['サブ戦死ノルマ達成', sAch+' / '+sTgt.length+' 名','目標=開始戦力×0.5%（T5+T4）・増援＋未回答が対象'],
     ['総戦死数', oku(ROWS.reduce((a,r)=>a+(g(r,'totalDead')||0),0)),'全体合計'],
   ];
   $('kpis').innerHTML=items.map(([l,v,s])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
 }
 function renderScopeBtns(){
-  const scopes=[['main','メイン',MAIN.length],['sub','サブのみ',SUBONLY.length],['unreg','未登録サブ',UNREG.length]];
+  const scopes=[['main','メイン',MAIN.length],['sub','増援サブ（未回答含む）',reinfSubs().length],['sub2','その他サブ',otherSubs().length],['unreg','未登録サブ',UNREG.length]];
   $('scopebtns').innerHTML='<span class="muted" style="font-size:12px;margin-right:2px">対象:</span>'+scopes.map(([k,l,n])=>`<div class="mbtn ${k===rankScope?'active':''}" data-s="${k}">${l}（${n}）</div>`).join('');
   $('scopebtns').querySelectorAll('.mbtn').forEach(b=>b.onclick=()=>{rankScope=b.dataset.s; renderRankTab();});
 }
 function renderMetricBtns(){
   const set=curSet(), cur=curKey();
   $('metricbtns').innerHTML='<span class="muted" style="font-size:12px;margin-right:2px">並び替え:</span>'+Object.entries(set).map(([k,m])=>`<div class="mbtn ${k===cur?'active':''}" data-m="${k}">${m.label}順</div>`).join('');
-  $('metricbtns').querySelectorAll('.mbtn').forEach(b=>b.onclick=()=>{if(rankScope==='sub')subMetric=b.dataset.m;else if(rankScope==='unreg')unregMetric=b.dataset.m;else mainMetric=b.dataset.m;renderMetricBtns();renderRanking();});
+  $('metricbtns').querySelectorAll('.mbtn').forEach(b=>b.onclick=()=>{if(rankScope==='sub')subMetric=b.dataset.m;else if(rankScope==='sub2')sub2Metric=b.dataset.m;else if(rankScope==='unreg')unregMetric=b.dataset.m;else mainMetric=b.dataset.m;renderMetricBtns();renderRanking();});
 }
 function renderRanking(){
   const set=curSet(), m=set[curKey()]||Object.values(set)[0], list=curList();
   const val=r=> m.calc? m.calc(r) : g(r,m.key);
   const base=m.filter? list.filter(m.filter) : list;
   const sorted=[...base].sort((a,b)=>{const d=(val(b)??-1)-(val(a)??-1);return m.asc?-d:d;});
-  $('rankTitle').textContent=(rankScope==='sub'?'サブのみ ':rankScope==='unreg'?'未登録サブ ':'メイン ')+m.label+' TOP20';
+  $('rankTitle').textContent=(rankScope==='sub'?'増援サブ ':rankScope==='sub2'?'その他サブ ':rankScope==='unreg'?'未登録サブ ':'メイン ')+m.label+' TOP20';
   const top=sorted.slice(0,20);
   if(charts.cRank)charts.cRank.destroy();
   charts.cRank=new Chart($('cRank'),{type:'bar',
@@ -787,14 +809,15 @@ function renderRanking(){
       scales:{x:{ticks:{color:'#96a2ba',callback:v=>m.isNorm?v+'%':oku(v)},grid:{color:'#263149'}},
         y:{ticks:{color:'#96a2ba',font:{size:11}},grid:{display:false}}}}});
   const th=$('rankTbl').querySelector('thead'), tb=$('rankTbl').querySelector('tbody');
-  if(rankScope==='sub'){
-    th.innerHTML='<tr><th>順位</th><th>名前</th><th>所属メイン</th><th>戦力</th><th>戦死</th><th>用途</th><th>戦死ノルマ</th><th>撃破P</th></tr>';
+  if(rankScope==='sub'||rankScope==='sub2'){
+    th.innerHTML='<tr><th>順位</th><th>名前</th><th>所属メイン</th><th>戦力</th><th>戦死(T5+T4)</th><th>目標戦死</th><th>用途</th><th>戦死ノルマ</th><th>撃破P</th></tr>';
     tb.innerHTML=sorted.map((r,i)=>{const mid=SUB2MAIN[String(g(r,'id'))]; const mn=(mid&&PMAP[mid])?g(PMAP[mid],'name'):(mid||'-');
-      const pw=g(r,'startPower');
+      const pw=g(r,'startPower'), dp=deathPct(r);
       const useCell=`<span class="muted">${useLabelOf(g(r,'id'))}</span>`;
+      const tgtCell=dp!=null?oku(deathTargetOf(pw)):'<span class="muted">-</span>';
       const nrmCell=judgeCell(r);
-      return `<tr data-id="${g(r,'id')}"><td><span class="${rkCls(i)}">${i+1}</span></td><td>${g(r,'name')}</td><td class="muted">${mn}</td><td>${oku(pw)}</td><td><b>${oku(g(r,'totalDead'))}</b></td><td>${useCell}</td><td>${nrmCell}</td><td>${oku(g(r,'totalKP'))}</td></tr>`;}).join('') || '<tr><td colspan="8" class="empty">サブのデータがありません</td></tr>';
-    $('rankHint').textContent='※ 戦死ノルマ＝用途アンケ「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。戦死0（赤）は未達、撃破0も併記。「ノルマ対象サブ(戦死0検出)」で未達が上に並ぶ。行クリックで個人ページへ。';
+      return `<tr data-id="${g(r,'id')}"><td><span class="${rkCls(i)}">${i+1}</span></td><td>${g(r,'name')}</td><td class="muted">${mn}</td><td>${oku(pw)}</td><td><b>${oku(deathCount(r))}</b></td><td>${tgtCell}</td><td>${useCell}</td><td>${nrmCell}</td><td>${oku(g(r,'totalKP'))}</td></tr>`;}).join('') || '<tr><td colspan="8" class="empty">サブのデータがありません</td></tr>';
+    $('rankHint').textContent='※ 戦死ノルマ＝T5+T4戦死÷（開始戦力×0.5%）。「増援」＋未回答のサブが対象（採取・政庁・休眠は対象外）。100%未満（赤）は未達。「戦死ノルマ(未達が上)」で未達から並ぶ。行クリックで個人ページへ。';
   } else if(rankScope==='unreg'){
     th.innerHTML='<tr><th>順位</th><th>名前</th><th>ID</th><th>開始戦力</th><th>戦死</th><th>撃破P</th><th>貢献P</th></tr>';
     tb.innerHTML=sorted.map((r,i)=>`<tr data-id="${g(r,'id')}"><td><span class="${rkCls(i)}">${i+1}</span></td><td>${g(r,'name')}</td><td class="muted">${g(r,'id')}</td><td>${oku(g(r,'startPower'))}</td><td><b>${oku(g(r,'totalDead'))}</b></td><td>${oku(g(r,'totalKP'))}</td><td>${oku(g(r,'contribPoint'))}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">未登録サブはいません</td></tr>';
@@ -806,7 +829,7 @@ function renderRanking(){
     $('rankHint').textContent='※ 行クリックで個人ページへ。100%未満（赤）は撃破ノルマ未達。';
   }
   tb.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=()=>{switchTab('search');$('q').value=tr.dataset.id;onSearch();window.scrollTo({top:0,behavior:'smooth'});});
-  $('rankCount').textContent='（'+(rankScope==='sub'?'サブ '+SUBONLY.length:rankScope==='unreg'?'未登録サブ '+UNREG.length:'メイン '+MAIN.length)+' 名）';
+  $('rankCount').textContent='（'+(rankScope==='sub'?'増援サブ '+reinfSubs().length:rankScope==='sub2'?'その他サブ '+otherSubs().length:rankScope==='unreg'?'未登録サブ '+UNREG.length:'メイン '+MAIN.length)+' 名）';
 }
 function renderRankTab(){renderKPIs();renderScopeBtns();renderMetricBtns();renderRanking();}
 
@@ -824,7 +847,7 @@ function renderCampPeriodBtns(){
 }
 function renderCampScopeBtns(){
   const ks=campKingdoms();
-  const btns=[['all','全体（自国＋他国）']].concat(ks.map(k=>[k,k]));
+  const btns=[['all','全体']].concat(ks.map(k=>[k,k]));
   if(!btns.some(b=>b[0]===campScope)) campScope='all';
   $('campscope').innerHTML='<span class="muted" style="font-size:12px;margin-right:2px">王国:</span>'+btns.map(([v,l])=>`<div class="mbtn ${v===campScope?'active':''}" data-c="${v}">${l}</div>`).join('');
   $('campscope').querySelectorAll('.mbtn').forEach(b=>b.onclick=()=>{campScope=b.dataset.c;renderCampScopeBtns();campShowAll=false;renderCamp();});
@@ -837,7 +860,7 @@ function renderCamp(){
   const m=CAMPMET[campMetric];
   let list=CAMPROWS; if(campPeriod) list=list.filter(r=>r.period===campPeriod); if(campScope!=='all') list=list.filter(r=>r.kingdom===campScope);
   const sorted=[...list].sort((a,b)=>(b[m.key]||0)-(a[m.key]||0));
-  $('campTitle').textContent=(campScope==='all'?'全体（自国＋他国）':campScope)+' ／ '+m.label+' TOP20';
+  $('campTitle').textContent=(campScope==='all'?'全体':campScope)+' ／ '+m.label+' TOP20';
   const top=sorted.slice(0,20);
   if(charts.cCamp)charts.cCamp.destroy();
   charts.cCamp=new Chart($('cCamp'),{type:'bar',
