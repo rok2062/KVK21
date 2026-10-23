@@ -671,9 +671,9 @@ function renderDetail(){
       const latest = pr? g(pr,'name') : s.subName;
       const dead = pr? g(pr,'totalDead') : null;
       const pw   = pr? g(pr,'startPower') : null;
-      if(pr){joined++; totDead+=(dd||0);}
       const dd = pr? deathCount(pr) : null;
       const tgt = (pr&&deathPct(pr)!=null)? deathTargetOf(pw) : null;
+      if(pr){joined++; totDead+=(dd||0);}
       const useCell = `<span class="muted">${useLabelOf(s.subId)}</span>`;
       const nrmCell = pr? judgeCell(pr) : '-';
       return `<tr data-id="${s.subId}"><td>${latest}${pr?'':' <span class="muted" style="font-size:10px">(登録名)</span>'}</td><td class="muted">${s.subId}</td><td>${pr?'<span class="ok">参加</span>':'<span class="muted">―</span>'}</td><td>${pw!=null?oku(pw):'-'}</td><td>${dd!=null?oku(dd):'-'}</td><td>${tgt!=null?oku(tgt):'<span class="muted">-</span>'}</td><td>${useCell}</td><td>${nrmCell}</td></tr>`;
