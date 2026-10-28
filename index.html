@@ -496,7 +496,7 @@ let DATA=null, C={}, ROWS=[], MAIN=[], SUBONLY=[], UNREG=[], SUBIDS=new Set(), U
 let SUBSMAP={}, SUB2MAIN={}, PMAP={}, dirSort={k:'contribPoint',d:-1}, dirFilter='all';
 let DAILY=[], DAILYMAP={}, HASDAILY=false;
 let KD={}, KDATES=[], KLIST=[];
-let rankScope='main', mainMetric='contrib', subMetric='dead', sub2Metric='dead', unregMetric='dead';
+let rankScope='main', mainMetric='kp', subMetric='dead', sub2Metric='dead', unregMetric='dead';
 let CAMPROWS=[], campScope='all', campMetric='kp', campPeriod='';
 const CAMP_CAP=200; let campShowAll=false, campNeedsRender=true, trendNeedsRender=true;
 let campSel=null, trendScope='compare', trendMetric='kp';
@@ -755,10 +755,10 @@ function onSearch(){renderDir();renderDetail();}
 
 /* ===== 王国ランキングタブ ===== */
 const METRICS={
-  contrib:{label:'貢献度Point',key:'contribPoint',color:'#a97bff',fmt:oku,isNorm:false},
   kp:{label:'撃破ポイント',key:'totalKP',color:'#5b93ff',fmt:oku,isNorm:false},
   dead:{label:'戦死数',key:'totalDead',color:'#ff5f70',fmt:oku,isNorm:false},
-  norm:{label:'撃破ノルマ',key:'kpNorm',color:'#3ecf8e',fmt:pct,isNorm:true}
+  norm:{label:'撃破ノルマ',key:'kpNorm',color:'#3ecf8e',fmt:pct,isNorm:true},
+  contrib:{label:'貢献度Point',key:'contribPoint',color:'#a97bff',fmt:oku,isNorm:false}
 };
 const SUBMETRICS={
   dead:{label:'戦死数',key:'totalDead',color:'#ff5f70',fmt:oku,isNorm:false},
