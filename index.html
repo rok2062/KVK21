@@ -386,6 +386,8 @@ function useLabelOf(id){const u=useOf(id);return u?USE_LABEL[u]:'未回答';}
 function isReinfRow(r){const u=useOf(g(r,'id'));return u==='R'||u==null;}
 /* 戦死ノルマ（ノルマ詳細シート）: 目標＝開始戦力×0.5%（兵数・T5/T4戦死のみカウント） */
 const DEATH_RATE=0.005;
+/* 撃破計測開始（情報シートと合わせる）: この日より前の撃破P・戦死は日次グラフでも0扱い */
+const KP_MEASURE_START='2026-10-30';
 
 /* ===== 最小サンプル（URL未設定・読み込み失敗時のみ）===== */
 const FALLBACK={"rows":[
@@ -481,8 +483,10 @@ function dailyToData(text){
     const id=String(r[2]||'').trim();
     if(!/^\d{4,}$/.test(id)) continue;
     const num=x=>Number(String(x==null?'':x).replace(/,/g,''))||0;
-    const dead=num(r[6])+num(r[7])+num(r[8])+num(r[9])+num(r[10]);
-    out.push({kingdom:String(r[0]||'').trim(), date:String(r[1]||'').trim(), id, name:String(r[3]||'').trim(), power:num(r[4]), kp:num(r[5]), dead});
+    let dead=num(r[6])+num(r[7])+num(r[8])+num(r[9])+num(r[10]), kp=num(r[5]);
+    const dt=String(r[1]||'').trim();
+    if(KP_MEASURE_START && dt && dt<KP_MEASURE_START){ kp=0; dead=0; } // 撃破計測開始前は0扱い
+    out.push({kingdom:String(r[0]||'').trim(), date:dt, id, name:String(r[3]||'').trim(), power:num(r[4]), kp, dead});
   }
   return out;
 }
@@ -846,7 +850,7 @@ function renderCampPeriodBtns(){
   el.querySelectorAll('.mbtn').forEach(b=>b.onclick=()=>{campPeriod=b.dataset.p;renderCampPeriodBtns();campShowAll=false;renderCamp();});
 }
 function renderCampScopeBtns(){
-  const ks=campKingdoms();
+  const ks=campKingdoms().sort((a,b)=>(isSelfK(b)?1:0)-(isSelfK(a)?1:0));
   const btns=[['all','全体']].concat(ks.map(k=>[k,k]));
   if(!btns.some(b=>b[0]===campScope)) campScope='all';
   $('campscope').innerHTML='<span class="muted" style="font-size:12px;margin-right:2px">王国:</span>'+btns.map(([v,l])=>`<div class="mbtn ${v===campScope?'active':''}" data-c="${v}">${l}</div>`).join('');
