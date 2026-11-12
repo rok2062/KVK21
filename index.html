@@ -493,7 +493,7 @@ function dailyToData(text){
 
 /* ===== 状態 ===== */
 let DATA=null, C={}, ROWS=[], MAIN=[], SUBONLY=[], UNREG=[], SUBIDS=new Set(), UNREGIDS=new Set(), charts={};
-let SUBSMAP={}, SUB2MAIN={}, PMAP={}, dirSort={k:'contribPoint',d:-1}, dirFilter='all';
+let SUBSMAP={}, SUB2MAIN={}, PMAP={}, dirSort={k:'totalKP',d:-1}, dirFilter='all';
 let DAILY=[], DAILYMAP={}, HASDAILY=false;
 let KD={}, KDATES=[], KLIST=[];
 let rankScope='main', mainMetric='kp', subMetric='dead', sub2Metric='dead', unregMetric='dead';
@@ -609,7 +609,7 @@ function fbData(){
 }
 
 /* ===== 個人検索タブ ===== */
-const DIRCOLS=[['name','名前'],['id','ID'],['kind','区分'],['use','用途'],['contribPoint','貢献P'],['totalKP','撃破P'],['totalDead','戦死'],['kpNorm','撃破ノルマ'],['dnorm','戦死ノルマ']];
+const DIRCOLS=[['name','名前'],['id','ID'],['kind','区分'],['use','用途'],['totalKP','撃破P'],['totalDead','戦死'],['kpNorm','撃破ノルマ'],['dnorm','戦死ノルマ'],['contribPoint','貢献P']];
 function dirVal(r,k){
   const kd=kindOf(r);
   if(k==='kind') return kd==='main'?0:kd==='sub'?1:2;
@@ -638,7 +638,7 @@ function renderDir(){
     const kpCell=kd==='main'?`<span class="${kn>=100?'ok':'ng'}">${pct(kn)}</span>`:'<span class="muted">対象外</span>';
     const dnCell=kd==='sub'? judgeCell(r) : '<span class="muted">対象外</span>';
     const useCell=kd==='sub'? useLabelOf(g(r,'id')) : '<span class="muted">-</span>';
-    return `<tr data-id="${g(r,'id')}"><td>${g(r,'name')}</td><td>${g(r,'id')}</td><td style="text-align:left">${kindPill(r)}</td><td>${useCell}</td><td>${oku(g(r,'contribPoint'))}</td><td>${oku(g(r,'totalKP'))}</td><td>${oku(g(r,'totalDead'))}</td><td>${kpCell}</td><td>${dnCell}</td></tr>`;
+    return `<tr data-id="${g(r,'id')}"><td>${g(r,'name')}</td><td>${g(r,'id')}</td><td style="text-align:left">${kindPill(r)}</td><td>${useCell}</td><td>${oku(g(r,'totalKP'))}</td><td>${oku(g(r,'totalDead'))}</td><td>${kpCell}</td><td>${dnCell}</td><td>${oku(g(r,'contribPoint'))}</td></tr>`;
   }).join('') || '<tr><td colspan="9" class="empty">該当なし</td></tr>';
   $('dir').querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>{$('q').value=tr.dataset.id;onSearch();});
   $('dirCount').textContent='（'+list.length+' 名'+(q?' / 検索一致':'')+'）';
