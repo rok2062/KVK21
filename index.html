@@ -214,6 +214,10 @@ const DICT=[
 ["合計（撃破・戦死）","Totals (KP & deaths)"],
 ["全体（自国＋他国）","All (ours + rivals)"],
 ["サブ戦死ノルマ達成","Sub death quota met"],
+["役割×","Role ×"],
+["アンケ回答なし×","No survey ×"],
+["城焼×","Burn ×"],
+["基礎 ","Base "],
 ["戦死ノルマ(未達が上)","Death quota (misses first)"],
 ["戦死(T5+T4)","Deaths (T5+T4)"],
 ["目標戦死","Death target"],
@@ -403,10 +407,10 @@ const CAMP_FALLBACK=[
  {"id":"51275801","name":"ハナコ","power":127071631,"kp":36990950,"dead":2713179,"deadT5":1627907,"deadT4":1085272,"kingdom":"他国 3025(サンプル)","period":"全期間"}];
 
 /* ===== パース ===== */
-const COLS=['id','name','targetKPinc','targetDeathCnt','startPower','startKP','startDead','targetKP','targetDeath','firstKP','firstKPrank','firstDead','firstDeadRank','secondKP','secondKPrank','secondDead','secondDeadRank','totalKP','totalDead','totalDeadT4','totalDeadT5','kpRank','deadRank','contribRank','contribPoint','kpNorm','deathNorm','powerCap','sub'];
+const COLS=['id','name','targetKPinc','targetDeathCnt','startPower','startKP','startDead','targetKP','targetDeath','firstKP','firstKPrank','firstDead','firstDeadRank','secondKP','secondKPrank','secondDead','secondDeadRank','totalKP','totalDead','totalDeadT4','totalDeadT5','kpRank','deadRank','contribRank','contribPoint','kpNorm','deathNorm','powerCap','sub','baseContrib','roleCoef','burnCoef','noAns','noAnsCoef'];
 const IX={id:0,name:1,sub:2,startPower:3,targetKPinc:4,targetDeathCnt:5,totalKP:6,totalDead:7,totalDeadT4:8,totalDeadT5:9,kpRank:10,deadRank:11,contribRank:12,contribPoint:13,kpNorm:14,deathNorm:15};
 const RANKK=new Set(['firstKPrank','firstDeadRank','secondKPrank','secondDeadRank','kpRank','deadRank','contribRank']);
-const STRK=new Set(['id','name','sub']);
+const STRK=new Set(['id','name','sub','noAns']);
 function parseCSV(text){
   const rows=[]; let f='',row=[],q=false;
   for(let i=0;i<text.length;i++){const c=text[i];
@@ -430,7 +434,7 @@ const HDRMAP={'id':'id','ID':'id','name':'name','NAME':'name','Name':'name','sub
   'Start Power':'startPower','撃破数目標値':'targetKPinc','目標死者数':'targetDeathCnt',
   'Total KP':'totalKP','Total Dead':'totalDead','Total Dead T4':'totalDeadT4','Total Dead T5':'totalDeadT5',
   'KP Rank':'kpRank','Dead Rank':'deadRank','貢献順位':'contribRank','貢献Point':'contribPoint',
-  '撃破ノルマ達成率':'kpNorm','戦死ノルマ達成率':'deathNorm'};
+  '撃破ノルマ達成率':'kpNorm','戦死ノルマ達成率':'deathNorm','基礎貢献Point':'baseContrib','役割係数':'roleCoef','城焼係数':'burnCoef','アンケ回答なし':'noAns','未回答係数':'noAnsCoef'};
 function csvToData(text){
   const arr=parseCSV(text);
   let map=null;
@@ -523,6 +527,11 @@ function deathCount(r){return (g(r,'totalDeadT5')||0)+(g(r,'totalDeadT4')||0);}
 function deathTargetOf(p){return Math.round((p||0)*DEATH_RATE);}
 function deathPct(r){ if(!isReinfRow(r)) return null;
   const t=deathTargetOf(g(r,'startPower')); return t>0? deathCount(r)/t*100 : null; }
+/* 貢献度の係数表示（ポータルに係数列がある場合のみ） */
+function coefNote(r){ const rc=g(r,'roleCoef')||0, bc=g(r,'burnCoef')||0, nc=g(r,'noAnsCoef')||0;
+  const parts=[]; if(rc&&rc!==1) parts.push('役割×'+rc); if(bc&&bc!==1) parts.push((String(g(r,'noAns')).toLowerCase()==='yes'?'アンケ回答なし×':'城焼×')+bc);
+  if(nc&&nc!==1) parts.push('アンケ回答なし×'+nc);
+  return parts.length? `<br><span class="muted">基礎 ${oku(g(r,'baseContrib'))} ・ ${parts.join(' ・ ')}</span>` : ''; }
 function judgeCell(r){ const p=deathPct(r);
   if(p==null) return `<span class="muted">対象外(${useLabelOf(g(r,'id'))})</span>`;
   const z=deathCount(r)===0, kp0=(g(r,'totalKP')||0)===0;
@@ -689,7 +698,7 @@ function renderDetail(){
   det.innerHTML=`<div class="card"><div class="detail-head"><span class="nm">${g(r,'name')}</span><span class="id">ID: ${g(r,'id')}</span><span class="pill main">MAIN</span><span class="id">開始戦力 ${oku(g(r,'startPower'))}</span></div>
     <div class="norm"><div class="normbox"><div class="t">⚔️ 撃破ノルマ達成率</div><div class="big" style="color:${kpColor}">${pct(kpN)}</div>${bars(kpN,Math.max(150,kpN),kpColor)}<div class="meta">獲得 ${yen(dispKP)} / 目標 ${yen(tgtKP)}</div></div>
     <div class="normbox"><div class="t">\u{1F480} 戦死ノルマ達成率</div><div class="big" style="color:var(--muted)">対象外</div><div class="meta">戦死ノルマはサブのみ対象 ・ 戦死 ${yen(dispDead)}（T5 ${yen(g(r,'totalDeadT5'))} / T4 ${yen(g(r,'totalDeadT4'))}）</div></div></div>
-    <div class="statgrid"><div class="sb"><div class="l">貢献順位</div><div class="v">${g(r,'contribRank')??'-'} <span class="muted" style="font-size:12px">/ ${N}</span></div><div class="r">貢献Point ${oku(g(r,'contribPoint'))}</div></div>
+    <div class="statgrid"><div class="sb"><div class="l">貢献順位</div><div class="v">${g(r,'contribRank')??'-'} <span class="muted" style="font-size:12px">/ ${N}</span></div><div class="r">貢献Point ${oku(g(r,'contribPoint'))}${coefNote(r)}</div></div>
     <div class="sb"><div class="l">撃破順位</div><div class="v">${g(r,'kpRank')??'-'} <span class="muted" style="font-size:12px">/ ${N}</span></div><div class="r">Total KP ${yen(dispKP)}</div></div>
     <div class="sb"><div class="l">戦死順位</div><div class="v">${g(r,'deadRank')??'-'} <span class="muted" style="font-size:12px">/ ${N}</span></div><div class="r">Total Dead ${yen(dispDead)}</div></div>
     <div class="sb"><div class="l">撃破ノルマ判定</div><div class="v">${kpN>=100?'達成':'未達'}</div><div class="r">${kpN>=100?'':'未達ペナルティ対象'}</div></div></div>
