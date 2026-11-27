@@ -56,6 +56,7 @@ body{margin:0;background:radial-gradient(1200px 500px at 70% -10%,#1a2440 0%,var
 .pill{font-size:11px;padding:2px 10px;border-radius:11px;font-weight:800}
 .pill.main{background:rgba(62,207,142,.12);color:var(--green);border:1px solid rgba(62,207,142,.4)}
 .pill.sub{background:rgba(255,182,74,.12);color:var(--amber);border:1px solid rgba(255,182,74,.4)}
+.pill.ans{background:rgba(91,147,255,.15);color:var(--blue);border:1px solid rgba(91,147,255,.45);padding:1px 6px;margin-left:6px;font-size:10px}
 .pill.unreg{background:rgba(150,162,186,.12);color:var(--muted);border:1px solid rgba(150,162,186,.4)}
 .norm{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
 .normbox{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:13px}
@@ -407,10 +408,10 @@ const CAMP_FALLBACK=[
  {"id":"51275801","name":"ハナコ","power":127071631,"kp":36990950,"dead":2713179,"deadT5":1627907,"deadT4":1085272,"kingdom":"他国 3025(サンプル)","period":"全期間"}];
 
 /* ===== パース ===== */
-const COLS=['id','name','targetKPinc','targetDeathCnt','startPower','startKP','startDead','targetKP','targetDeath','firstKP','firstKPrank','firstDead','firstDeadRank','secondKP','secondKPrank','secondDead','secondDeadRank','totalKP','totalDead','totalDeadT4','totalDeadT5','kpRank','deadRank','contribRank','contribPoint','kpNorm','deathNorm','powerCap','sub','baseContrib','roleCoef','burnCoef','noAns','noAnsCoef'];
+const COLS=['id','name','targetKPinc','targetDeathCnt','startPower','startKP','startDead','targetKP','targetDeath','firstKP','firstKPrank','firstDead','firstDeadRank','secondKP','secondKPrank','secondDead','secondDeadRank','totalKP','totalDead','totalDeadT4','totalDeadT5','kpRank','deadRank','contribRank','contribPoint','kpNorm','deathNorm','powerCap','sub','baseContrib','roleCoef','burnCoef','noAns','noAnsCoef','answered'];
 const IX={id:0,name:1,sub:2,startPower:3,targetKPinc:4,targetDeathCnt:5,totalKP:6,totalDead:7,totalDeadT4:8,totalDeadT5:9,kpRank:10,deadRank:11,contribRank:12,contribPoint:13,kpNorm:14,deathNorm:15};
 const RANKK=new Set(['firstKPrank','firstDeadRank','secondKPrank','secondDeadRank','kpRank','deadRank','contribRank']);
-const STRK=new Set(['id','name','sub','noAns']);
+const STRK=new Set(['id','name','sub','noAns','answered']);
 function parseCSV(text){
   const rows=[]; let f='',row=[],q=false;
   for(let i=0;i<text.length;i++){const c=text[i];
@@ -434,7 +435,7 @@ const HDRMAP={'id':'id','ID':'id','name':'name','NAME':'name','Name':'name','sub
   'Start Power':'startPower','撃破数目標値':'targetKPinc','目標死者数':'targetDeathCnt',
   'Total KP':'totalKP','Total Dead':'totalDead','Total Dead T4':'totalDeadT4','Total Dead T5':'totalDeadT5',
   'KP Rank':'kpRank','Dead Rank':'deadRank','貢献順位':'contribRank','貢献Point':'contribPoint',
-  '撃破ノルマ達成率':'kpNorm','戦死ノルマ達成率':'deathNorm','基礎貢献Point':'baseContrib','役割係数':'roleCoef','城焼係数':'burnCoef','アンケ回答なし':'noAns','未回答係数':'noAnsCoef'};
+  '撃破ノルマ達成率':'kpNorm','戦死ノルマ達成率':'deathNorm','基礎貢献Point':'baseContrib','役割係数':'roleCoef','城焼係数':'burnCoef','アンケ回答なし':'noAns','未回答係数':'noAnsCoef','postKVK回答':'answered'};
 function csvToData(text){
   const arr=parseCSV(text);
   let map=null;
@@ -532,6 +533,9 @@ function coefNote(r){ const rc=g(r,'roleCoef')||0, bc=g(r,'burnCoef')||0, nc=g(r
   const parts=[]; if(rc&&rc!==1) parts.push('役割×'+rc); if(bc&&bc!==1) parts.push((String(g(r,'noAns')).toLowerCase()==='yes'?'アンケ回答なし×':'城焼×')+bc);
   if(nc&&nc!==1) parts.push('アンケ回答なし×'+nc);
   return parts.length? `<br><span class="muted">基礎 ${oku(g(r,'baseContrib'))} ・ ${parts.join(' ・ ')}</span>` : ''; }
+/* postKVKアンケ回答済みマーク */
+function ansMark(r){ return String(g(r,'answered')||'').toLowerCase()==='yes'
+  ? `<span class="pill ans" title="${LANG==='en'?'Post-KvK survey answered':'KVK後アンケート回答済み'}">${LANG==='en'?'A':'答'}</span>` : ''; }
 function judgeCell(r){ const p=deathPct(r);
   if(p==null) return `<span class="muted">対象外(${useLabelOf(g(r,'id'))})</span>`;
   const z=deathCount(r)===0, kp0=(g(r,'totalKP')||0)===0;
@@ -647,7 +651,7 @@ function renderDir(){
     const kpCell=kd==='main'?`<span class="${kn>=100?'ok':'ng'}">${pct(kn)}</span>`:'<span class="muted">対象外</span>';
     const dnCell=kd==='sub'? judgeCell(r) : '<span class="muted">対象外</span>';
     const useCell=kd==='sub'? useLabelOf(g(r,'id')) : '<span class="muted">-</span>';
-    return `<tr data-id="${g(r,'id')}"><td>${g(r,'name')}</td><td>${g(r,'id')}</td><td style="text-align:left">${kindPill(r)}</td><td>${useCell}</td><td>${oku(g(r,'totalKP'))}</td><td>${oku(g(r,'totalDead'))}</td><td>${kpCell}</td><td>${dnCell}</td><td>${oku(g(r,'contribPoint'))}</td></tr>`;
+    return `<tr data-id="${g(r,'id')}"><td>${g(r,'name')}${ansMark(r)}</td><td>${g(r,'id')}</td><td style="text-align:left">${kindPill(r)}</td><td>${useCell}</td><td>${oku(g(r,'totalKP'))}</td><td>${oku(g(r,'totalDead'))}</td><td>${kpCell}</td><td>${dnCell}</td><td>${oku(g(r,'contribPoint'))}</td></tr>`;
   }).join('') || '<tr><td colspan="9" class="empty">該当なし</td></tr>';
   $('dir').querySelectorAll('tbody tr[data-id]').forEach(tr=>tr.onclick=()=>{$('q').value=tr.dataset.id;onSearch();});
   $('dirCount').textContent='（'+list.length+' 名'+(q?' / 検索一致':'')+'）';
